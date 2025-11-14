@@ -9,9 +9,9 @@ black = "*"
 flask = "*"
 pymongo = "*"
 tomli = "*"
+typing_extensions = "*"
 
 [dev-packages]
-tomli = "*"
 
 [requires]
 python_version = "3.10"
