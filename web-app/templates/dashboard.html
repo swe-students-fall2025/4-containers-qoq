@@ -3,24 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>qoq</title>
+    <script type="module" src="https://unpkg.com/@splinetool/viewer@1.11.4/build/spline-viewer.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 <body>
+    <spline-viewer url="https://prod.spline.design/echRf7Gn5-lvxTj9/scene.splinecode"></spline-viewer>
     <header>
-        <h1>Dashboard</h1>
-        <nav>
-            <ul>
-                <li><a href="{{ url_for('index') }}">Home</a></li>
-                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-
-            </ul>
-        </nav>
+        <div class="header-logo">qoq.</div>
+        <div class="header-menu-container">
+            <button class="menu-button">Menu</button>
+            <nav class="menu-nav">
+                <a href="{{ url_for('index')}}">Home</a>
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            </nav>
+        </div>
+        <div></div>
     </header>
 
-    <main>
+    <main class="main-content">
+        <h1>OVERVIEW</h1>
+        <div class="dashboard-grid">
+            <!--Total # of Runs-->
+            <div>
+                <div class="card-header">Total Runs</div>
+                <div id="total-runs">0</div>
+                <div id="last-analysis-time">--</div>
+            </div>
+
+            <!-- # of Instruments -->
+             <div>
+                <div class="card-header">Diff Instruments</div>
+                <div id="diff-instruments">0</div>
+             </div>
+
+             <!--Top Instrument -->
+             <div>
+                <div class="card-header">Top Instrument</div>
+                <div id="top-instrument">--</div>
+                <div id="top-instrument-confidence">--%</div>
+             </div>
+
+             <!--Recent Logs-->
+             <div>
+                <div class="card-header">Recent Logs</div>
+                <div id="recent-log-container"></div>
+             </div>
+
+             <!--Instrument Chart-->
+             <!--Recent Detection trend chart-->
+        </div>
     </main>
 
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 
 </html>
