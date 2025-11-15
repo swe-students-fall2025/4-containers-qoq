@@ -11,10 +11,61 @@ header {
     left: 0;
     right: 0;
     z-index: 50;
+    padding: 1rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     color: white;
     font-family: 'Share Tech Mono', monospace;
-    pointer-events: auto;
+}
+
+/* menu */
+.header-menu-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-menu-container:hover .menu-button {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.header-menu-container:hover .menu-nav {
+    opacity: 1;
+    visibility: visible;
+}
+
+.menu-button {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+}
+
+.menu-button:hover { color: #ccc; }
+
+.menu-nav {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    font-size: 0.875rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+.menu-nav a {
+    color: inherit;
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    transition: color 0.15s;
 }
