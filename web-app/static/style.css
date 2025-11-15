@@ -96,3 +96,50 @@ header {
     font-size: 3.75rem;
     transition: color 0.5s ease;
 }
+
+/* upload mic button */
+.micupload-container {
+    position: fixed;
+    left: 50%;                  
+    bottom: 2rem;              
+    transform: translateX(-50%); 
+    z-index: 40;
+    display: flex;
+    flex-direction: row;       
+    align-items: center;
+    column-gap: 2rem;           
+    pointer-events: auto;
+}
+
+.action-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    background-color: transparent;
+    border: 2px solid black;
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    text-decoration: none;
+    user-select: none;
+}
+
+.action-button.hidden{
+    display: none;
+    opacity: 0;
+}
+
+.action-button:hover {
+    border-color: #9CA3AF;
+    transform: scale(1.03);
+}
+
+.action-button-text {
+    font-family: 'Share Tech Mono', monospace;
+    color: white;
+    text-transform: uppercase;
+}
+
