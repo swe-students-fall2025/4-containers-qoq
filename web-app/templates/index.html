@@ -24,6 +24,23 @@
         </div>
         <div></div>
     </header>
+
+    <div class="main-content">
+        <div class="title-area">
+            <h1 id="main-title" class="main-title outline">Detecting<br>...</h1>
+        </div>
+
+        <!--mic and upload-->
+        <div class="micupload-container">
+            <div class="action-button" id="record" role="button">
+                <span class="action-button-text" id="record-text">Record</span>
+            </div>
+            <div class="action-button" id="upload" role="button">
+                <span class="action-button-text">Upload</span>
+            </div>
+            <input type="file" id="audioFile" accept="audio/*" hidden>
+        </div>
+    </div>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 
