@@ -113,6 +113,23 @@ header {
 .card-header {
     font-size: 1.25rem;
     padding-bottom: 0.5rem;
-    
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #d1d5db;
+    font-family: 'Share Tech Mono';
+    color: #000;
 }
 
+/* desktop size */
+@media (min-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .lg-col-span-2 {
+        grid-column: span 2;
+    }
+    
+    .lg-col-span-1 {
+        grid-column: span 1;
+    }
+}
