@@ -104,6 +104,7 @@ header {
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     padding: 2rem 1.5rem;
+    font-family: 'Share Tech Mono', monospace;
 }
 
 .card:hover {
@@ -118,6 +119,20 @@ header {
     font-family: 'Share Tech Mono';
     color: #000;
 }
+
+ .log-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+    color: #1f2937;
+}
+
+.font-mono {
+    font-family: 'Share Tech Mono', monospace;
+} 
+
 
 /* desktop size */
 @media (min-width: 1024px) {
