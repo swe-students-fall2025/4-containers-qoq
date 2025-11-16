@@ -1,30 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"~>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Detection</title>
+    <title>qoq</title>
+    <script type="module" src="https://unpkg.com/@splinetool/viewer@1.11.4/build/spline-viewer.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <spline-viewer
+        url="https://prod.spline.design/echRf7Gn5-lvxTj9/scene.splinecode"
+        style="position: fixed; top:0; left:0; width:100vw; height:100vh; z-index:0; pointer-events: auto;">
+    </spline-viewer>
     <header>
-        <h1>Audio Detection</h1>
-        <nav>
-            <a href="{{ url_for('dashboard') }}">Dashboard</a>
-
-        </nav>
+        <div class="header-logo">qoq.</div>
+        <div class="header-menu-container">
+            <button class="menu-button">Menu</button>
+            <nav class="menu-nav">
+                <a href="{{ url_for('index')}}">Home</a>
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            </nav>
+        </div>
+        <div></div>
     </header>
 
-    <main>
-        <h2>Record or Upload Audio</h2>
-        
-        <input type="file" id="audioFile" accept="audio/*">
-        <button id="uploadBtn">Detect</button>
+    <div class="main-content">
+        <div class="title-area">
+            <h1 id="main-title" class="main-title outline">Detecting<br>...</h1>
+        </div>
 
-        <h3>Prediction:</h3>
-        <p id="prediction">Not Yet</p>
-    </main>
-
+        <!--mic and upload-->
+        <div class="micupload-container">
+            <div class="action-button" id="record" role="button">
+                <span class="action-button-text" id="record-text">Record</span>
+            </div>
+            <div class="action-button" id="upload" role="button">
+                <span class="action-button-text">Upload</span>
+            </div>
+            <input type="file" id="audioFile" accept="audio/*" hidden>
+        </div>
+    </div>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 
