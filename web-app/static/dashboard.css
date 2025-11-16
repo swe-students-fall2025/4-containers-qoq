@@ -78,3 +78,41 @@ header {
     transition: color 0.15s;
 }
 
+/* main */
+
+.main-content {
+    max-width: 1280px;
+    margin: 3rem auto 0 auto;
+    padding: 0 1rem;
+}
+
+.main-content h1 {
+    margin-bottom: 2rem;
+    font-size: 1.5rem;
+    font-family: 'Share Tech Mono', monospace;
+    color: #000;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+.card {
+    background-color: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 2rem 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-4px)
+}
+
+.card-header {
+    font-size: 1.25rem;
+    padding-bottom: 0.5rem;
+    
+}
+
