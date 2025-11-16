@@ -16,3 +16,39 @@ const STATIC_DATA = {
         { instrument: "DRUMS", time: "14:29:45", confidence: 94 },
     ],
 };
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("total-runs").textContent = STATIC_DATA.total_runs;
+    document.getElementById("top-instrument").textContent = STATIC_DATA.top_instrument;
+    document.getElementById("top-instrument-confidence").textContent = STATIC_DATA.top_instrument_confidence + "%";
+    document.getElementById("diff-instruments").textContent = STATIC_DATA.unique_instruments_count;
+
+    const logContainer = document.getElementById("recent-log-container");
+    while (logContainer.firstChild) {
+        logContainer.removeChild(logContainer.firstChild);
+    }
+
+    if (STATIC_DATA.recent_log.length === 0) {
+        const emptyMsg = document.createElement("div");
+        emptyMsg.className = "text-gray-500 py-2 font-mono";
+        emptyMsg.textContent = "No recent analysis found";
+        logContainer.appendChild(emptyMsg);
+    } else {
+        STATIC_DATA.recent_log.forEach(entry => {
+            const logEntry = document.createElement("div");
+            logEntry.className = "log-entry flex justify-between font-mono";
+
+            // left side instruments
+            const instrumentSpan = document.createElement("span");
+            instrumentSpan.textContent = entry.instrument;
+
+            // right side time and conf
+            const detailsSpan = document.createElement("span");
+            detailsSpan.textContent = `${entry.time} - Confidence: ${entry.confidence}%`;
+
+            logEntry.appendChild(instrumentSpan);
+            logEntry.appendChild(detailsSpan);
+            logContainer.appendChild(logEntry);
+        });
+    }
+});
