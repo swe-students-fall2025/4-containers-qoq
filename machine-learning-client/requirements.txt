@@ -1,0 +1,5 @@
+numpy
+librosa
+tensorflow-hub
+scipy
+mediapipe
