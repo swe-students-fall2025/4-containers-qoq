@@ -4,12 +4,16 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pylint = "*"
-black = "*"
 flask = "*"
 pymongo = "*"
+mediapipe = "*"
+numpy = "*"
+scipy = "*"
+python-dotenv = "*"
 tomli = "*"
 typing_extensions = "*"
+pylint = "*"
+black = "*"
 
 [dev-packages]
 

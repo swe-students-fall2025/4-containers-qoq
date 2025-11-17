@@ -1,14 +1,17 @@
+"""Flask backend for the instrument classification web app."""
+
 import os
 import tempfile
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from functools import lru_cache
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 from scipy.io import wavfile
 
-import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import audio as mp_audio
 from mediapipe.tasks.python.components import containers as mp_containers
@@ -19,16 +22,18 @@ MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongodb:27017")
 MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "ml_logs")
 MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "predictions")
 
-_mongo_client: Optional[MongoClient] = None
+
+@lru_cache(maxsize=1)
+def _get_mongo_client() -> MongoClient:
+    """Create (and memoize) a MongoClient instance."""
+    return MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 
 
 def get_collection():
     """Return the MongoDB collection used to store predictions."""
-    global _mongo_client
-    if _mongo_client is None:
-        _mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    db = _mongo_client[MONGO_DB_NAME]
+    db = _get_mongo_client()[MONGO_DB_NAME]
     return db[MONGO_COLLECTION]
+
 
 BaseOptions = mp_python.BaseOptions
 AudioClassifier = mp_audio.AudioClassifier
@@ -38,51 +43,61 @@ AudioData = mp_containers.AudioData
 
 MODEL_PATH = os.environ.get(
     "AUDIO_MODEL_PATH",
-    os.path.join(os.path.dirname(__file__), "models", "lite-model_yamnet_classification_tflite_1.tflite"),
+    os.path.join(
+        os.path.dirname(__file__),
+        "models",
+        "lite-model_yamnet_classification_tflite_1.tflite",
+    ),
 )
 
-_audio_classifier: Optional[AudioClassifier] = None
 
-
+@lru_cache(maxsize=1)
 def get_audio_classifier() -> AudioClassifier:
-    """Lazily create the MediaPipe AudioClassifier."""
-    global _audio_classifier  
-    if _audio_classifier is None:
-        base_options = BaseOptions(model_asset_path=MODEL_PATH)
-        options = AudioClassifierOptions(
-            base_options=base_options,
-            running_mode=AudioRunningMode.AUDIO_CLIPS,
-            max_results=5,
-        )
-        _audio_classifier = AudioClassifier.create_from_options(options)
-    return _audio_classifier
+    """Create and cache the MediaPipe AudioClassifier."""
+    base_options = BaseOptions(model_asset_path=MODEL_PATH)
+    options = AudioClassifierOptions(
+        base_options=base_options,
+        running_mode=AudioRunningMode.AUDIO_CLIPS,
+        max_results=5,
+    )
+    return AudioClassifier.create_from_options(options)
 
 
-def classify_wav(path: str):
+class AudioClassificationError(RuntimeError):
+    """Raised when an uploaded clip cannot be classified."""
+
+
+def classify_wav(path: str) -> Tuple[str, float]:
     """Run MediaPipe Audio Classifier on a .wav file and return (label, score)."""
-    sample_rate, wav_data = wavfile.read(path)
+    try:
+        sample_rate, wav_data = wavfile.read(path)
+    except (OSError, ValueError) as exc:
+        raise AudioClassificationError(f"unable to read audio: {exc}") from exc
 
     if wav_data.ndim > 1:
         wav_data = wav_data[:, 0]
 
-    max_val = np.max(np.abs(wav_data))
-    if max_val == 0:
-        norm = wav_data.astype(np.float32)
-    else:
-        norm = wav_data.astype(np.float32) / max_val
+    max_val = float(np.max(np.abs(wav_data)))
+    norm = wav_data.astype(np.float32)
+    if max_val > 0:
+        norm = norm / max_val
 
     audio_data = AudioData.create_from_array(norm, sample_rate)
 
     classifier = get_audio_classifier()
-    result_list = classifier.classify(audio_data)
-    result = result_list[0]
+    try:
+        result_list = classifier.classify(audio_data)
+    except RuntimeError as exc:
+        raise AudioClassificationError(f"classifier failed: {exc}") from exc
 
-    head = result.classifications[0]
+    head = result_list[0].classifications[0]
     top_cat = head.categories[0]
-
     return top_cat.category_name, float(top_cat.score)
 
+
 def _serialize_prediction(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert a MongoDB prediction document into JSON-serializable data."""
+
     def _dt(value):
         if isinstance(value, datetime):
             return value.astimezone(timezone.utc).isoformat()
@@ -99,6 +114,7 @@ def _serialize_prediction(doc: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _parse_iso_dt(value: Any) -> Optional[datetime]:
+    """Parse an ISO 8601 datetime (or return None for invalid input)."""
     if not value or not isinstance(value, str):
         return None
     try:
@@ -110,7 +126,13 @@ def _parse_iso_dt(value: Any) -> Optional[datetime]:
         return None
 
 
-def _store_prediction(instrument: str, confidence: float, source: str, captured_at: Optional[datetime] = None):
+def _store_prediction(
+    instrument: str,
+    confidence: float,
+    source: str,
+    captured_at: Optional[datetime] = None,
+):
+    """Persist a prediction document and return its serialized payload."""
     now = datetime.now(timezone.utc)
     if captured_at is None:
         captured_at = now
@@ -128,14 +150,18 @@ def _store_prediction(instrument: str, confidence: float, source: str, captured_
     doc["_id"] = result.inserted_id
     return _serialize_prediction(doc)
 
+
 @app.route("/", methods=["GET"])
 def index():
+    """Render the landing page."""
     return render_template("index.html")
 
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
+    """Render the dashboard shell (data fetched via AJAX)."""
     return render_template("dashboard.html")
+
 
 @app.route("/api/predictions", methods=["POST"])
 def api_create_prediction():
@@ -210,22 +236,25 @@ def api_dashboard_data():
 
     recent = predictions[:10]
 
-    return jsonify(
-        {
-            "total_runs": total_runs,
-            "diff_instruments": diff_instruments,
-            "top_instrument": top_instrument,
-            "top_instrument_confidence": top_conf,
-            "last_analysis_time": last_time,
-            "recent": recent,
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "total_runs": total_runs,
+                "diff_instruments": diff_instruments,
+                "top_instrument": top_instrument,
+                "top_instrument_confidence": top_conf,
+                "last_analysis_time": last_time,
+                "recent": recent,
+            }
+        ),
+        200,
+    )
+
 
 @app.route("/api/classify-upload", methods=["POST"])
 def api_classify_upload():
     """
-    Accept an uploaded audio file, classify it with MediaPipe, store to MongoDB,
-    and return the predicted instrument.
+    Accept an uploaded audio file, classify it, store the result, and respond.
     """
     if "audio" not in request.files:
         return jsonify({"error": "missing 'audio' file field"}), 400
@@ -234,17 +263,18 @@ def api_classify_upload():
     if not file.filename:
         return jsonify({"error": "empty filename"}), 400
 
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        tmp_path = tmp.name
-        file.save(tmp_path)
-
+    tmp_path = None
     try:
-        label, score = classify_wav(tmp_path)
-    except Exception as exc:
-        os.remove(tmp_path)
-        return jsonify({"error": f"classification failed: {exc}"}), 500
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = tmp.name
+            file.save(tmp_path)
 
-    os.remove(tmp_path)
+        label, score = classify_wav(tmp_path)
+    except AudioClassificationError as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
     pred = _store_prediction(label or "unknown", score, source="upload")
     return jsonify(pred), 200
@@ -252,15 +282,16 @@ def api_classify_upload():
 
 @app.route("/health", methods=["GET"])
 def health():
+    """Simple MongoDB connectivity health-check."""
     try:
         col = get_collection()
         col.find_one()
         status = "ok"
-    except Exception as exc:
+    except PyMongoError as exc:
         status = f"error: {exc}"
     return jsonify({"status": status}), 200
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
+    port = int(os.environ.get("PORT", "5001"))
     app.run(host="0.0.0.0", port=port, debug=True)
