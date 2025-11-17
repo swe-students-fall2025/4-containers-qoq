@@ -1,3 +1,6 @@
 Flask
 pymongo
+mediapipe
+scipy
+numpy
 python-dotenv
