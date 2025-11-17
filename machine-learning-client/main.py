@@ -1,8 +1,10 @@
-import tensorflow_hub as hub
+"""Machine Learning Client using YAMNET"""
+
+import os
+import csv
 import numpy as np
 import librosa
-import csv
-import os
+import tensorflow_hub as hub
 
 AUDIO_FILE = "data.wav"
 TARGET_SAMPLE_RATE = 16000
@@ -42,6 +44,7 @@ INSTRUMENT_KEYWORDS = [
 
 
 def load_class_map():
+    """Load class names from csv"""
     if not os.path.exists(CLASS_MAP_FILE):
         print(f"Error: Class map file not found at '{CLASS_MAP_FILE}'")
         return None
@@ -61,24 +64,26 @@ def load_class_map():
             return None
         return class_names
 
-    except Exception as e:
+    except (OSError, csv.Error) as e:
         print(f"Error reading class map file: {e}")
         return None
 
 
 def load_audio(file_path, target_sr):
+    """Load audio file to target sample rate"""
     try:
-        waveform, sr = librosa.load(file_path, sr=target_sr, mono=True)
+        waveform, _ = librosa.load(file_path, sr=target_sr, mono=True)
         return waveform
     except FileNotFoundError:
         print(f"Error: Audio file not found at '{file_path}'")
         return None
-    except Exception as e:
+    except librosa.util.exceptions.ParameterError as e:
         print(f"Error loading audio file: {e}")
         return None
 
 
 def main():
+    """Main function to detect instrument"""
     if not os.path.exists(AUDIO_FILE):
         print(f"Error: {AUDIO_FILE} not found.")
         return
@@ -89,14 +94,14 @@ def main():
     try:
         model = hub.load("https://tfhub.dev/google/yamnet/1")
         print("Model loaded successfully.")
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         print(f"Error loading model: {e}")
         return
     print(f"Loading audio from {AUDIO_FILE}.")
     waveform = load_audio(AUDIO_FILE, TARGET_SAMPLE_RATE)
     if waveform is None:
         return
-    scores, embeddings, log_mel_spectrogram = model(waveform)
+    scores, _, _ = model(waveform)
     mean_scores = np.mean(scores.numpy(), axis=0)
     results = []
     for i, score in enumerate(mean_scores):
