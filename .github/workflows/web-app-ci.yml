@@ -1,0 +1,46 @@
+name: Web App CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web-app/**"
+      - ".github/workflows/web-app-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "web-app/**"
+      - ".github/workflows/web-app-ci.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          cd web-app
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          cd web-app
+          pytest --cov=. --cov-report=xml --cov-report=term --cov-fail-under=80 test_app.py
+
+      - name: Build Docker image
+        run: |
+          cd web-app
+          docker build -t web-app-test .
+
+      - name: Test Docker image
+        run: |
+          docker run --rm web-app-test python -c "import app; print('App imports successfully')"
+
