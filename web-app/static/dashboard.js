@@ -1,3 +1,6 @@
+let lineChart, barChart;
+let dashboardLogs = [];
+
 async function fetchDashboardData(){
     try {
         const res = await fetch("/api/dashboard-data");
@@ -21,6 +24,17 @@ async function fetchDashboardData(){
 
         // recent logs
         renderRecent(data.recent);
+
+        if (data.recent && data.recent.length > 0) {
+            data.recent.forEach(log => {
+                if (!dashboardLogs.find(l => l.captured_at === log.captured_at)) {
+                    dashboardLogs.push(log);
+                }
+            });
+
+            dashboardLogs.sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at));
+            renderCharts(dashboardLogs);
+        }
 
     } catch (err) {
         console.error("Dashboard load failed:", err);
@@ -77,6 +91,84 @@ function renderRecent(list) {
     });
     container.appendChild(table);
 }
+
+function renderCharts(logs) {
+    // 50 logs
+    const recentLogs = logs.slice(-50);
+    const labels = recentLogs.map(log => new Date(log.captured_at).toLocaleString()); // use full datetime
+    const confidences = recentLogs.map(log => (log.confidence * 100).toFixed(1));
+    const instruments = recentLogs.map(log => log.instrument);
+
+    // line chart
+    const ctxLine = document.getElementById("lineChart").getContext("2d");
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Confidence (%)',
+                data: confidences,
+                borderColor: '#000',
+                backgroundColor: 'rgba(0,0,0,0.1)',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 5,
+                pointBackgroundColor: '#3b82f6',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { min: 60, max: 100, title: { display: true, text: 'CONFIDENCE (%)' } },
+                x: { title: { display: true, text: 'TIMESTAMP' } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `Confidence: ${ctx.formattedValue}% | Instrument: ${instruments[ctx.dataIndex]}`
+                    }
+                }
+            }
+        }
+    });
+
+    // bar chart
+    const ctxBar = document.getElementById("barChart").getContext("2d");
+    const counts = {};
+    recentLogs.forEach(log => counts[log.instrument] = (counts[log.instrument] || 0) + 1);
+
+    const barLabels = Object.keys(counts);
+    const barData = Object.values(counts);
+
+    if (barChart) barChart.destroy();
+    barChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: barLabels,
+            datasets: [{
+                label: 'Frequency',
+                data: barData,
+                backgroundColor: '#3b82f6',
+                borderColor: '#000',
+                borderWidth: 1,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'COUNT' } },
+                x: { title: { display: true, text: 'INSTRUMENTS' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
 
 fetchDashboardData();
 setInterval(fetchDashboardData, 4000);
