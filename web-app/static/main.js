@@ -39,5 +39,47 @@ async function sendToServer(blob){
 }
 
 // recording
+recordBtn.addEventListener("click", async () => {
+    if(!isRecording){
+        // start recording
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+            mediaRecorder = new MediaRecorder(stream);
+            chunks = [];
+
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(chunks, {type: "audio/wav"});
+                await sendToServer(blob)  
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            recordText.textContent = "Stop";
+            titleText.textContent = "Listening...";
+        } catch (err) {
+            console.error("Mic error:", err);
+        }
+    } else {
+        // stop recording
+        mediaRecorder.stop()
+        isRecording = false;
+        recordText.textContent = "Record";
+        titleText.textContent = "Processing..."
+    }
+    
+}); 
 
 // upload 
+uploadBtn.addEventListener("click", () => {
+    fileInput.click();
+});
+
+fileInput.addEventListener("change", async () => {
+    if (fileInput.files.length === 0){
+        return;
+    }
+    const file = fileInput.files[0];
+    titleText.textContent = "Processing...";
+    await sendToServer(file);
+})
