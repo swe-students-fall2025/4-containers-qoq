@@ -7,12 +7,14 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-from flask import Flask
+from pymongo.errors import PyMongoError
 
-# Import app after setting up test environment
+# Set environment variables before importing app
 os.environ["MONGO_URI"] = "mongodb://test:27017"
 os.environ["AUDIO_MODEL_PATH"] = os.path.join(
-    os.path.dirname(__file__), "models", "lite-model_yamnet_classification_tflite_1.tflite"
+    os.path.dirname(__file__),
+    "models",
+    "lite-model_yamnet_classification_tflite_1.tflite",
 )
 
 from app import (
@@ -21,25 +23,20 @@ from app import (
     _parse_iso_dt,
     _serialize_prediction,
     _store_prediction,
-    api_classify_upload,
-    api_create_prediction,
-    api_dashboard_data,
-    api_list_predictions,
     classify_wav,
-    health,
 )
 
 
 @pytest.fixture
-def client():
+def test_client():
     """Create a test client."""
     app.config["TESTING"] = True
-    with app.test_client() as test_client:
-        yield test_client
+    with app.test_client() as client:
+        yield client
 
 
 @pytest.fixture
-def mock_collection():
+def mock_mongo_collection():
     """Mock MongoDB collection."""
     with patch("app.get_collection") as mock_get_collection:
         mock_col = MagicMock()
@@ -48,7 +45,7 @@ def mock_collection():
 
 
 @pytest.fixture
-def sample_prediction():
+def sample_prediction_doc():
     """Sample prediction document."""
     return {
         "_id": "507f1f77bcf86cd799439011",
@@ -60,50 +57,48 @@ def sample_prediction():
     }
 
 
-def test_index(client):
+def test_index(test_client):
     """Test the index route."""
-    response = client.get("/")
+    response = test_client.get("/")
     assert response.status_code == 200
 
 
-def test_dashboard(client):
+def test_dashboard(test_client):
     """Test the dashboard route."""
-    response = client.get("/dashboard")
+    response = test_client.get("/dashboard")
     assert response.status_code == 200
 
 
-def test_health_ok(mock_collection):
+def test_health_ok(mock_mongo_collection):
     """Test health check when MongoDB is connected."""
-    mock_collection.find_one.return_value = {}
-    with app.test_client() as client:
-        response = client.get("/health")
+    mock_mongo_collection.find_one.return_value = {}
+    with app.test_client() as test_client:
+        response = test_client.get("/health")
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "ok"
 
 
-def test_health_error(mock_collection):
+def test_health_error(mock_mongo_collection):
     """Test health check when MongoDB connection fails."""
-    from pymongo.errors import PyMongoError
-
-    mock_collection.find_one.side_effect = PyMongoError("Connection failed")
-    with app.test_client() as client:
-        response = client.get("/health")
+    mock_mongo_collection.find_one.side_effect = PyMongoError("Connection failed")
+    with app.test_client() as test_client:
+        response = test_client.get("/health")
         assert response.status_code == 200
         data = response.get_json()
         assert "error" in data["status"]
 
 
-def test_api_create_prediction_success(mock_collection, client):
+def test_api_create_prediction_success(mock_mongo_collection, test_client):
     """Test creating a prediction via API."""
-    mock_collection.insert_one.return_value = Mock(inserted_id="test_id")
+    mock_mongo_collection.insert_one.return_value = Mock(inserted_id="test_id")
     payload = {
         "instrument": "guitar",
         "confidence": 0.85,
         "source": "test",
         "captured_at": "2024-01-15T10:30:00Z",
     }
-    response = client.post("/api/predictions", json=payload)
+    response = test_client.post("/api/predictions", json=payload)
     assert response.status_code == 201
     data = response.get_json()
     assert data["instrument"] == "guitar"
@@ -111,17 +106,17 @@ def test_api_create_prediction_success(mock_collection, client):
     assert data["source"] == "test"
 
 
-def test_api_create_prediction_missing_instrument(client):
+def test_api_create_prediction_missing_instrument(test_client):
     """Test creating prediction without instrument."""
-    response = client.post("/api/predictions", json={"confidence": 0.5})
+    response = test_client.post("/api/predictions", json={"confidence": 0.5})
     assert response.status_code == 400
     data = response.get_json()
     assert "error" in data
 
 
-def test_api_create_prediction_invalid_confidence(client):
+def test_api_create_prediction_invalid_confidence(test_client):
     """Test creating prediction with invalid confidence."""
-    response = client.post(
+    response = test_client.post(
         "/api/predictions", json={"instrument": "piano", "confidence": "invalid"}
     )
     assert response.status_code == 400
@@ -129,35 +124,41 @@ def test_api_create_prediction_invalid_confidence(client):
     assert "error" in data
 
 
-def test_api_list_predictions(mock_collection, client, sample_prediction):
+def test_api_list_predictions(
+    mock_mongo_collection, test_client, sample_prediction_doc
+):
     """Test listing predictions."""
-    mock_collection.find.return_value.sort.return_value.limit.return_value = [
-        sample_prediction
+    mock_mongo_collection.find.return_value.sort.return_value.limit.return_value = [
+        sample_prediction_doc
     ]
-    response = client.get("/api/predictions")
+    response = test_client.get("/api/predictions")
     assert response.status_code == 200
     data = response.get_json()
     assert isinstance(data, list)
     assert len(data) == 1
 
 
-def test_api_list_predictions_with_limit(mock_collection, client, sample_prediction):
+def test_api_list_predictions_with_limit(
+    mock_mongo_collection, test_client, sample_prediction_doc
+):
     """Test listing predictions with custom limit."""
-    mock_collection.find.return_value.sort.return_value.limit.return_value = [
-        sample_prediction
+    mock_mongo_collection.find.return_value.sort.return_value.limit.return_value = [
+        sample_prediction_doc
     ]
-    response = client.get("/api/predictions?limit=10")
+    response = test_client.get("/api/predictions?limit=10")
     assert response.status_code == 200
-    mock_collection.find.return_value.sort.return_value.limit.assert_called_with(10)
+    mock_mongo_collection.find.return_value.sort.return_value.limit.assert_called_with(
+        10
+    )
 
 
-def test_api_dashboard_data(mock_collection, client, sample_prediction):
+def test_api_dashboard_data(mock_mongo_collection, test_client, sample_prediction_doc):
     """Test dashboard data aggregation."""
-    mock_collection.count_documents.return_value = 5
-    mock_collection.find.return_value.sort.return_value.limit.return_value = [
-        sample_prediction
+    mock_mongo_collection.count_documents.return_value = 5
+    mock_mongo_collection.find.return_value.sort.return_value.limit.return_value = [
+        sample_prediction_doc
     ]
-    response = client.get("/api/dashboard-data")
+    response = test_client.get("/api/dashboard-data")
     assert response.status_code == 200
     data = response.get_json()
     assert "total_runs" in data
@@ -166,9 +167,9 @@ def test_api_dashboard_data(mock_collection, client, sample_prediction):
     assert data["total_runs"] == 5
 
 
-def test_serialize_prediction(sample_prediction):
+def test_serialize_prediction(sample_prediction_doc):
     """Test prediction serialization."""
-    result = _serialize_prediction(sample_prediction)
+    result = _serialize_prediction(sample_prediction_doc)
     assert result["instrument"] == "piano"
     assert result["confidence"] == 0.95
     assert result["id"] == "507f1f77bcf86cd799439011"
@@ -265,7 +266,7 @@ def test_classify_wav_file_error(mock_librosa):
 
 @patch("app.classify_wav")
 @patch("app._store_prediction")
-def test_api_classify_upload_success(mock_store, mock_classify, mock_collection, client):
+def test_api_classify_upload_success(mock_store, mock_classify, test_client):
     """Test successful audio upload and classification."""
     mock_classify.return_value = ("piano", 0.88)
     mock_store.return_value = {
@@ -281,7 +282,9 @@ def test_api_classify_upload_success(mock_store, mock_classify, mock_collection,
 
     try:
         with open(tmp_path, "rb") as f:
-            response = client.post("/api/classify-upload", data={"audio": (f, "test.wav")})
+            response = test_client.post(
+                "/api/classify-upload", data={"audio": (f, "test.wav")}
+            )
         assert response.status_code == 200
         data = response.get_json()
         assert data["instrument"] == "piano"
@@ -291,38 +294,37 @@ def test_api_classify_upload_success(mock_store, mock_classify, mock_collection,
             os.remove(tmp_path)
 
 
-def test_api_classify_upload_no_file(client):
+def test_api_classify_upload_no_file(test_client):
     """Test upload without file."""
-    response = client.post("/api/classify-upload")
+    response = test_client.post("/api/classify-upload")
     assert response.status_code == 400
     data = response.get_json()
     assert "error" in data
 
 
-def test_api_classify_upload_empty_filename(client):
+def test_api_classify_upload_empty_filename(test_client):
     """Test upload with empty filename."""
-    response = client.post("/api/classify-upload", data={"audio": (b"", "")})
+    response = test_client.post("/api/classify-upload", data={"audio": (b"", "")})
     assert response.status_code == 400
     data = response.get_json()
     assert "error" in data
 
 
-def test_store_prediction(mock_collection):
+def test_store_prediction(mock_mongo_collection):
     """Test storing a prediction."""
-    mock_collection.insert_one.return_value = Mock(inserted_id="test_id")
+    mock_mongo_collection.insert_one.return_value = Mock(inserted_id="test_id")
     result = _store_prediction("violin", 0.75, "test")
     assert result["instrument"] == "violin"
     assert result["confidence"] == 0.75
     assert result["source"] == "test"
     assert result["id"] == "test_id"
-    mock_collection.insert_one.assert_called_once()
+    mock_mongo_collection.insert_one.assert_called_once()
 
 
-def test_store_prediction_with_captured_at(mock_collection):
+def test_store_prediction_with_captured_at(mock_mongo_collection):
     """Test storing prediction with custom captured_at."""
-    mock_collection.insert_one.return_value = Mock(inserted_id="test_id")
+    mock_mongo_collection.insert_one.return_value = Mock(inserted_id="test_id")
     custom_time = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
     result = _store_prediction("guitar", 0.90, "test", captured_at=custom_time)
     assert result["instrument"] == "guitar"
-    mock_collection.insert_one.assert_called_once()
-
+    mock_mongo_collection.insert_one.assert_called_once()
