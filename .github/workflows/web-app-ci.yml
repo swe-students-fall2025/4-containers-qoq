@@ -46,8 +46,9 @@ jobs:
       - name: Run tests with coverage
         working-directory: ./web-app
         run: |
-          coverage run -m pytest
-          coverage report --fail-under=80 --source=web-app
+          coverage run --source=web-app -m pytest
+          coverage report --fail-under=80
+
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
