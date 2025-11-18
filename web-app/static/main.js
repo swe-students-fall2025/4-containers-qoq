@@ -9,9 +9,9 @@ let chunks = [];
 let isRecording = false;
 
 // send audio to Flask
-async function sendToServer(blob){
+async function sendToServer(blob, filename = "recording.wav"){
     const formData = new FormData();
-    formData.append("audio", blob, "recording.wav");
+    formData.append("audio", blob, filename);
 
     titleText.textContent = "Detecting...";
 
@@ -24,7 +24,7 @@ async function sendToServer(blob){
         const data = await res.json();
         if(!res.ok || data.error){
             titleText.textContent = "Error";
-            console.error("Server error:", data.error);
+            console.error("Server error:", data.error || "Unknown error");
             return;
         }
 
@@ -44,25 +44,58 @@ recordBtn.addEventListener("click", async () => {
         // start recording
         try {
             const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-            mediaRecorder = new MediaRecorder(stream);
+            // Use the browser's preferred audio format (usually webm)
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                           MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+                           MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg' : '';
+            
+            mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
             chunks = [];
 
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) {
+                    chunks.push(e.data);
+                }
+            };
+            
             mediaRecorder.onstop = async () => {
-                const blob = new Blob(chunks, {type: "audio/wav"});
-                await sendToServer(blob)  
+                if (chunks.length === 0) {
+                    titleText.textContent = "Error: No audio recorded";
+                    console.error("No audio chunks recorded");
+                    return;
+                }
+                
+                const blob = new Blob(chunks, {type: mediaRecorder.mimeType || 'audio/webm'});
+                
+                if (blob.size === 0) {
+                    titleText.textContent = "Error: Empty recording";
+                    console.error("Recorded blob is empty");
+                    return;
+                }
+                
+                // Use appropriate file extension based on MIME type
+                const ext = blob.type.includes('webm') ? '.webm' : 
+                           blob.type.includes('ogg') ? '.ogg' : '.wav';
+                console.log(`Sending audio: ${blob.size} bytes, type: ${blob.type}, ext: ${ext}`);
+                await sendToServer(blob, `recording${ext}`);
             };
 
-            mediaRecorder.start();
+            // Request data periodically to avoid empty chunks
+            mediaRecorder.start(100); // Request data every 100ms
             isRecording = true;
             recordText.textContent = "Stop";
             titleText.textContent = "Listening...";
         } catch (err) {
             console.error("Mic error:", err);
+            titleText.textContent = "Error: Mic access denied";
         }
     } else {
         // stop recording
-        mediaRecorder.stop()
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            // Stop all tracks to release microphone
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
         isRecording = false;
         recordText.textContent = "Record";
         titleText.textContent = "Processing..."

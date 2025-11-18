@@ -2,13 +2,22 @@
 
 import os
 import csv
+from datetime import datetime, timezone
+
 import numpy as np
 import librosa
 import tensorflow_hub as hub
+from pymongo import MongoClient
 
-AUDIO_FILE = "data.wav"
+AUDIO_FILE = os.environ.get("AUDIO_FILE", "data.wav")
 TARGET_SAMPLE_RATE = 16000
 CLASS_MAP_FILE = "yamnet_class_map.csv"
+
+# MongoDB configuration
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongodb:27017")
+MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "ml_logs")
+MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "predictions")
+SOURCE_NAME = os.environ.get("SOURCE_NAME", "ml-client")
 
 INSTRUMENT_KEYWORDS = [
     "guitar",
@@ -82,6 +91,53 @@ def load_audio(file_path, target_sr):
         return None
 
 
+def get_collection():
+    """Return the MongoDB collection used to store predictions."""
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    db = client[MONGO_DB_NAME]
+    return db[MONGO_COLLECTION]
+
+
+def save_prediction(instrument, confidence):
+    """Save prediction result to MongoDB."""
+    now = datetime.now(timezone.utc)
+    doc = {
+        "instrument": instrument,
+        "confidence": float(confidence),
+        "source": SOURCE_NAME,
+        "captured_at": now,
+        "created_at": now,
+    }
+    try:
+        col = get_collection()
+        result = col.insert_one(doc)
+        print(f"Saved prediction to MongoDB with ID: {result.inserted_id}")
+        return True
+    except (OSError, RuntimeError, ValueError) as e:
+        print(f"Error saving to MongoDB: {e}")
+        return False
+
+
+def _process_scores(scores, class_names):
+    """Process model scores and return sorted results."""
+    mean_scores = np.mean(scores.numpy(), axis=0)
+    results = []
+    for i, score in enumerate(mean_scores):
+        results.append({"class_name": class_names[i], "score": score})
+    return sorted(results, key=lambda x: x["score"], reverse=True)
+
+
+def _find_instrument(sorted_results):
+    """Find the most likely instrument from sorted results."""
+    for res in sorted_results:
+        if res["score"] < 0.01:
+            break
+        for keyword in INSTRUMENT_KEYWORDS:
+            if keyword in res["class_name"].lower():
+                return res
+    return None
+
+
 def main():
     """Main function to detect instrument"""
     if not os.path.exists(AUDIO_FILE):
@@ -102,30 +158,16 @@ def main():
     if waveform is None:
         return
     scores, _, _ = model(waveform)
-    mean_scores = np.mean(scores.numpy(), axis=0)
-    results = []
-    for i, score in enumerate(mean_scores):
-        results.append({"class_name": class_names[i], "score": score})
-    sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
-    most_likely_instrument = None
-    for res in sorted_results:
-        if res["score"] < 0.01:
-            break
-        is_instrument = False
-        for keyword in INSTRUMENT_KEYWORDS:
-            if keyword in res["class_name"].lower():
-                most_likely_instrument = res
-                is_instrument = True
-                break
-
-        if is_instrument:
-            break
+    sorted_results = _process_scores(scores, class_names)
+    most_likely_instrument = _find_instrument(sorted_results)
     if most_likely_instrument:
-        print(
-            f"{most_likely_instrument['class_name']}: {most_likely_instrument['score']:.4f}"
-        )
+        instrument_name = most_likely_instrument["class_name"]
+        confidence_score = most_likely_instrument["score"]
+        print(f"Detected: {instrument_name} (confidence: {confidence_score:.4f})")
+        save_prediction(instrument_name, confidence_score)
     else:
         print("No specific musical instruments detected.")
+        save_prediction("unknown", 0.0)
 
 
 if __name__ == "__main__":

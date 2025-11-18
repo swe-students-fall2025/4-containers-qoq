@@ -2,15 +2,17 @@
 
 import os
 import tempfile
+import traceback
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import librosa
+from pydub import AudioSegment
 from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
-from scipy.io import wavfile
 
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import audio as mp_audio
@@ -67,21 +69,45 @@ class AudioClassificationError(RuntimeError):
     """Raised when an uploaded clip cannot be classified."""
 
 
-def classify_wav(path: str) -> Tuple[str, float]:
-    """Run MediaPipe Audio Classifier on a .wav file and return (label, score)."""
+def _convert_audio_with_pydub(path: str) -> Tuple[np.ndarray, int]:
+    """Convert audio file to WAV format using pydub and return audio data."""
+    audio = AudioSegment.from_file(path)
+    wav_bytes = audio.export(
+        format="wav", parameters=["-ar", "16000", "-ac", "1"]
+    ).read()
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
+        tmp_wav.write(wav_bytes)
+        tmp_wav_path = tmp_wav.name
     try:
-        sample_rate, wav_data = wavfile.read(path)
-    except (OSError, ValueError) as exc:
-        raise AudioClassificationError(f"unable to read audio: {exc}") from exc
+        wav_data, sample_rate = librosa.load(tmp_wav_path, sr=16000, mono=True)
+        return wav_data, sample_rate
+    finally:
+        if os.path.exists(tmp_wav_path):
+            os.remove(tmp_wav_path)
 
-    if wav_data.ndim > 1:
-        wav_data = wav_data[:, 0]
 
+def _normalize_audio(wav_data: np.ndarray) -> np.ndarray:
+    """Normalize audio data to [-1, 1] range."""
     max_val = float(np.max(np.abs(wav_data)))
     norm = wav_data.astype(np.float32)
     if max_val > 0:
         norm = norm / max_val
+    return norm
 
+
+def classify_wav(path: str) -> Tuple[str, float]:
+    """Run MediaPipe Audio Classifier on an audio file and return (label, score)."""
+    try:
+        wav_data, sample_rate = librosa.load(path, sr=16000, mono=True)
+    except (OSError, ValueError) as exc:
+        try:
+            wav_data, sample_rate = _convert_audio_with_pydub(path)
+        except (OSError, ValueError) as conv_exc:
+            raise AudioClassificationError(
+                f"unable to read audio: {exc} (conversion also failed: {conv_exc})"
+            ) from exc
+
+    norm = _normalize_audio(wav_data)
     audio_data = AudioData.create_from_array(norm, sample_rate)
 
     classifier = get_audio_classifier()
@@ -265,13 +291,17 @@ def api_classify_upload():
 
     tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        file_ext = os.path.splitext(file.filename)[1] or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
             tmp_path = tmp.name
             file.save(tmp_path)
 
         label, score = classify_wav(tmp_path)
     except AudioClassificationError as exc:
         return jsonify({"error": str(exc)}), 500
+    except (OSError, ValueError, RuntimeError) as exc:
+        app.logger.error("Unexpected error: %s\n%s", exc, traceback.format_exc())
+        return jsonify({"error": f"processing failed: {str(exc)}"}), 500
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
