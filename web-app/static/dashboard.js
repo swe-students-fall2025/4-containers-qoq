@@ -52,3 +52,34 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+async function fetchDashboardData(){
+    try {
+        const res = await fetch("/api/dashboard-data");
+        const data = await res.json();
+
+        document.getElementById("total-runs").textContent = data.total_runs;
+        document.getElementById("diff-instruments").textContent = data.diff_instruments;
+
+        // top instrument
+        if (data.top_instrument){
+            document.getElementById("top-instrument").textContent = data.top_instrument;
+            document.getElementById("top-instrument-confidence").textContent = (data.top_instrument_confidence * 100).toFixed(1) + "%";
+        } else {
+            document.getElementById("top-instrument").textContent = "--";
+            document.getElementById("top-instrument-confidence").textContent = "--%";
+        }
+
+        // last analysis time
+        const lastTimeElem = document.getElementById("last-analysis-time");
+        lastTimeElem.textContent = data.last_analysis_time ? new Date(data.last_analysis_time).toLocaleString() : "--";
+
+        // recent logs
+        renderRecent(data.recent);
+
+    } catch (err) {
+        console.error("Dashboard load failed:", err);
+    }
+}
+
+
