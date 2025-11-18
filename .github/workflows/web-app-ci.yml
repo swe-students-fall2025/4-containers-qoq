@@ -46,8 +46,8 @@ jobs:
       - name: Run tests with coverage
         working-directory: ./web-app
         run: |
-          coverage run --source=web-app -m pytest
-          coverage report --fail-under=80
+          pipenv run coverage run -m pytest
+          pipenv run coverage report --fail-under=80
 
 
       - name: Set up Docker Buildx
