@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>qoq</title>
     <script type="module" src="https://unpkg.com/@splinetool/viewer@1.11.4/build/spline-viewer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
@@ -49,13 +50,30 @@
              </div>
 
             <!--Recent Logs-->
-            <div class="card lg-col-span-2">
-                <div class="card-header">Recent Analysis Log (Last 10)</div>
-                <div id="recent-log-container" class="recent-log-table"></div>
+            <div class="recent-flex-container lg-col-span-4">
+                <div class="card recent-log-card">
+                    <div class="card-header">Recent Analysis Log (Last 10)</div>
+                    <div id="recent-log-container" class="recent-log-table"></div>
+                </div>
             </div>
 
-             <!--Instrument Chart-->
-             <!--Recent Detection trend chart-->
+            <!--Instrument Chart-->
+            <!--Recent Detection trend Chart-->
+            <div class="third-row">
+                <div class="card bar-chart-card">
+                    <div class="card-header">Instrument Distribution</div>
+                    <div class="chart-container">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card line-chart-card">
+                    <div class="card-header">Recent Detections Trend</div>
+                    <div class="chart-container">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 

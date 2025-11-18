@@ -52,8 +52,8 @@ The system consists of three main components:
    ```
 
 3. Access the web application:
-   - Open your browser to `http://localhost:5001`
-   - The dashboard will be available at `http://localhost:5001/dashboard`
+   - Open your browser to `http://localhost:5000`
+   - The dashboard will be available at `http://localhost:5000/dashboard`
 
 ### Manual Setup (Development)
 
@@ -89,13 +89,13 @@ pip install -r requirements.txt
 export MONGO_URI="mongodb://localhost:27017"
 export MONGO_DB_NAME="ml_logs"
 export MONGO_COLLECTION="predictions"
-export PORT=5001
+export PORT=5000
 
 # Run the Flask app
 python app.py
 ```
 
-Then open `http://localhost:5001` in your browser.
+Then open `http://localhost:5000` in your browser.
 
 ## Environment Variables
 
@@ -116,7 +116,7 @@ Then open `http://localhost:5001` in your browser.
 | `MONGO_URI` | `mongodb://mongodb:27017` | MongoDB connection string |
 | `MONGO_DB_NAME` | `ml_logs` | MongoDB database name |
 | `MONGO_COLLECTION` | `predictions` | MongoDB collection name |
-| `PORT` | `5001` | Port for Flask web server |
+| `PORT` | `5000` | Port for Flask web server |
 | `AUDIO_MODEL_PATH` | `models/lite-model_yamnet_classification_tflite_1.tflite` | Path to MediaPipe audio model |
 
 ### Example `.env` File
@@ -138,7 +138,7 @@ AUDIO_FILE=data.wav
 SOURCE_NAME=ml-client
 
 # Web App Configuration
-PORT=5001
+PORT=5000
 AUDIO_MODEL_PATH=models/lite-model_yamnet_classification_tflite_1.tflite
 ```
 
@@ -208,14 +208,14 @@ No starter data is required. The database will be populated automatically as:
 ### Example: Upload Audio File
 
 ```bash
-curl -X POST http://localhost:5001/api/classify-upload \
+curl -X POST http://localhost:5000/api/classify-upload \
   -F "audio=@path/to/audio.wav"
 ```
 
 ### Example: Create Prediction Manually
 
 ```bash
-curl -X POST http://localhost:5001/api/predictions \
+curl -X POST http://localhost:5000/api/predictions \
   -H "Content-Type: application/json" \
   -d '{
     "instrument": "piano",
@@ -297,7 +297,7 @@ If the ML client or web app cannot connect to MongoDB:
 
 ### Port Already in Use
 
-If port 5001 is already in use (common on macOS due to AirPlay):
+If port 5000 is already in use (common on macOS due to AirPlay):
 
 1. Change the `PORT` environment variable
 2. Or disable AirPlay Receiver in System Settings
