@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+import traceback
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple
@@ -76,7 +77,9 @@ def classify_wav(path: str) -> Tuple[str, float]:
         try:
             audio = AudioSegment.from_file(path)
 
-            wav_bytes = audio.export(format="wav", parameters=["-ar", "16000", "-ac", "1"]).read()
+            wav_bytes = audio.export(
+                format="wav", parameters=["-ar", "16000", "-ac", "1"]
+            ).read()
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
                 tmp_wav.write(wav_bytes)
                 tmp_wav_path = tmp_wav.name
@@ -86,7 +89,9 @@ def classify_wav(path: str) -> Tuple[str, float]:
                 if os.path.exists(tmp_wav_path):
                     os.remove(tmp_wav_path)
         except Exception as conv_exc:
-            raise AudioClassificationError(f"unable to read audio: {exc} (conversion also failed: {conv_exc})") from exc
+            raise AudioClassificationError(
+                f"unable to read audio: {exc} (conversion also failed: {conv_exc})"
+            ) from exc
 
     max_val = float(np.max(np.abs(wav_data)))
     norm = wav_data.astype(np.float32)
@@ -285,8 +290,7 @@ def api_classify_upload():
     except AudioClassificationError as exc:
         return jsonify({"error": str(exc)}), 500
     except Exception as exc:
-        import traceback
-        app.logger.error(f"Unexpected error: {exc}\n{traceback.format_exc()}")
+        app.logger.error("Unexpected error: %s\n%s", exc, traceback.format_exc())
         return jsonify({"error": f"processing failed: {str(exc)}"}), 500
     finally:
         if tmp_path and os.path.exists(tmp_path):
