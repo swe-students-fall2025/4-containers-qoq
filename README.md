@@ -17,8 +17,10 @@ A containerized machine learning application that uses audio classification to i
 ## Team Members
 
 
-- Siqi Zhu - [https://github.com/HelenZhutt]
-- Krystal Lin - [https://github.com/krystalll-0]
+- [Siqi Zhu](https://github.com/HelenZhutt)
+- [Krystal Lin](https://github.com/krystalll-0)
+- [Angela Gao](https://github.com/Xuan4781)
+
 
 ## Architecture
 
@@ -119,7 +121,11 @@ Then open `http://localhost:5000` in your browser.
 
 ### Example `.env` File
 
-Create a `.env` file in the project root (not committed to version control):
+You can create a `.env` file in the project root to override default environment variables.
+
+Notes:
+- If `.env` is not present, Compose uses the defaults specified in `docker-compose.yml`.
+- You can change paths, port, or database settings.
 
 ```env
 # MongoDB Configuration

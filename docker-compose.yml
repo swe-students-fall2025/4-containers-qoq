@@ -23,11 +23,12 @@ services:
       mongodb:
         condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://mongodb:27017
-      - MONGO_DB_NAME=ml_logs
-      - MONGO_COLLECTION=predictions
-      - AUDIO_FILE=data.wav
-      - SOURCE_NAME=ml-client
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017}
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-ml_logs}
+      - MONGO_COLLECTION=${MONGO_COLLECTION:-predictions}
+      - AUDIO_FILE=${AUDIO_FILE:-data.wav}
+      - SOURCE_NAME=${SOURCE_NAME:-ml-client}
+
     networks:
       - app-network
     volumes:
@@ -39,15 +40,16 @@ services:
       dockerfile: Dockerfile
     container_name: web-app
     ports:
-      - "5001:5000"
+      - "5000:5000"
     depends_on:
       mongodb:
         condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://mongodb:27017
-      - MONGO_DB_NAME=ml_logs
-      - MONGO_COLLECTION=predictions
-      - PORT=5000
+    - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017}
+    - MONGO_DB_NAME=${MONGO_DB_NAME:-ml_logs}
+    - MONGO_COLLECTION=${MONGO_COLLECTION:-predictions}
+    - PORT=${PORT:-5000}
+
     networks:
       - app-network
 
