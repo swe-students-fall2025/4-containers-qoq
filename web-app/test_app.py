@@ -1,5 +1,8 @@
 """Unit tests for the Flask web application."""
 
+# pylint: disable=redefined-outer-name
+# Fixture names used as function parameters are standard pytest pattern
+
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -17,6 +20,8 @@ os.environ["AUDIO_MODEL_PATH"] = os.path.join(
     "lite-model_yamnet_classification_tflite_1.tflite",
 )
 
+# pylint: disable=wrong-import-position
+# Import must come after environment variables are set
 from app import (
     app,
     _normalize_audio,
