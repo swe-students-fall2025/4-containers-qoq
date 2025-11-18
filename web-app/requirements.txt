@@ -4,3 +4,6 @@ mediapipe
 scipy
 numpy
 python-dotenv
+librosa
+soundfile
+pydub

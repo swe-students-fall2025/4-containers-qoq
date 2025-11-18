@@ -7,10 +7,11 @@ from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import librosa
+from pydub import AudioSegment
 from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
-from scipy.io import wavfile
 
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import audio as mp_audio
@@ -68,14 +69,24 @@ class AudioClassificationError(RuntimeError):
 
 
 def classify_wav(path: str) -> Tuple[str, float]:
-    """Run MediaPipe Audio Classifier on a .wav file and return (label, score)."""
+    """Run MediaPipe Audio Classifier on an audio file and return (label, score)."""
     try:
-        sample_rate, wav_data = wavfile.read(path)
-    except (OSError, ValueError) as exc:
-        raise AudioClassificationError(f"unable to read audio: {exc}") from exc
+        wav_data, sample_rate = librosa.load(path, sr=16000, mono=True)
+    except Exception as exc:
+        try:
+            audio = AudioSegment.from_file(path)
 
-    if wav_data.ndim > 1:
-        wav_data = wav_data[:, 0]
+            wav_bytes = audio.export(format="wav", parameters=["-ar", "16000", "-ac", "1"]).read()
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
+                tmp_wav.write(wav_bytes)
+                tmp_wav_path = tmp_wav.name
+            try:
+                wav_data, sample_rate = librosa.load(tmp_wav_path, sr=16000, mono=True)
+            finally:
+                if os.path.exists(tmp_wav_path):
+                    os.remove(tmp_wav_path)
+        except Exception as conv_exc:
+            raise AudioClassificationError(f"unable to read audio: {exc} (conversion also failed: {conv_exc})") from exc
 
     max_val = float(np.max(np.abs(wav_data)))
     norm = wav_data.astype(np.float32)
@@ -265,13 +276,18 @@ def api_classify_upload():
 
     tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        file_ext = os.path.splitext(file.filename)[1] or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
             tmp_path = tmp.name
             file.save(tmp_path)
 
         label, score = classify_wav(tmp_path)
     except AudioClassificationError as exc:
         return jsonify({"error": str(exc)}), 500
+    except Exception as exc:
+        import traceback
+        app.logger.error(f"Unexpected error: {exc}\n{traceback.format_exc()}")
+        return jsonify({"error": f"processing failed: {str(exc)}"}), 500
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
