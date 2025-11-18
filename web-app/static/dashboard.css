@@ -97,11 +97,12 @@ header {
     border-radius: 0.75rem;
     padding: 2rem 1.5rem;
     font-family: 'Share Tech Mono', monospace;
-    pointer-events: none;
+    pointer-events: auto;
+    transition: transform 0.2s;
 }
 
 .card:hover {
-    transform: translateY(-4px)
+    transform: translateY(-4px);
 }
 
 .card-header {
@@ -126,18 +127,61 @@ header {
     font-family: 'Share Tech Mono', monospace;
 } 
 
+/* recent log table */
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
 
-/* desktop size */
+.log-table th, .log-table td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+}
+
+.log-table th {
+    background-color: #f3f4f6; 
+    font-weight: 600;
+}
+
+.log-table tr:nth-child(even) td {
+    background-color: #f9fafb;
+}
+
+
+/* charts */
+.recent-flex-container,
+.third-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+
+
 @media (min-width: 1024px) {
     .dashboard-grid {
         grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
     }
+    .lg-col-span-1 { grid-column: span 1; }
 
-    .lg-col-span-2 {
-        grid-column: span 2;
+    .recent-flex-container {
+        flex-direction: row;
+        grid-column: span 3;
     }
-    
-    .lg-col-span-1 {
-        grid-column: span 1;
+    .recent-log-card { flex: 1; }
+
+    .third-row {
+        flex-direction: row;
+        grid-column: span 3;
+        gap: 1rem;
+    }
+    .bar-chart-card,
+    .line-chart-card {
+        flex: 1;
     }
 }
