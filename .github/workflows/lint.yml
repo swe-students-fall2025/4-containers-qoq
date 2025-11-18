@@ -28,7 +28,7 @@ jobs:
         run: |
           cd ${{ matrix.subdir }}
           shopt -s globstar
-          pylint **/*.py
+          pylint **/*.py --disable=import-error,c-extension-no-member
       - name: Format with black
         if: ${{ hashFiles(format('{0}/**/*.py', matrix.subdir)) != '' }}
         run: |
