@@ -4,3 +4,4 @@ tensorflow-hub
 scipy
 mediapipe
 pymongo
+pylint
