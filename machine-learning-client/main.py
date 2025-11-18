@@ -113,9 +113,29 @@ def save_prediction(instrument, confidence):
         result = col.insert_one(doc)
         print(f"Saved prediction to MongoDB with ID: {result.inserted_id}")
         return True
-    except Exception as e:
+    except (OSError, RuntimeError, ValueError) as e:
         print(f"Error saving to MongoDB: {e}")
         return False
+
+
+def _process_scores(scores, class_names):
+    """Process model scores and return sorted results."""
+    mean_scores = np.mean(scores.numpy(), axis=0)
+    results = []
+    for i, score in enumerate(mean_scores):
+        results.append({"class_name": class_names[i], "score": score})
+    return sorted(results, key=lambda x: x["score"], reverse=True)
+
+
+def _find_instrument(sorted_results):
+    """Find the most likely instrument from sorted results."""
+    for res in sorted_results:
+        if res["score"] < 0.01:
+            break
+        for keyword in INSTRUMENT_KEYWORDS:
+            if keyword in res["class_name"].lower():
+                return res
+    return None
 
 
 def main():
@@ -138,33 +158,15 @@ def main():
     if waveform is None:
         return
     scores, _, _ = model(waveform)
-    mean_scores = np.mean(scores.numpy(), axis=0)
-    results = []
-    for i, score in enumerate(mean_scores):
-        results.append({"class_name": class_names[i], "score": score})
-    sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
-    most_likely_instrument = None
-    for res in sorted_results:
-        if res["score"] < 0.01:
-            break
-        is_instrument = False
-        for keyword in INSTRUMENT_KEYWORDS:
-            if keyword in res["class_name"].lower():
-                most_likely_instrument = res
-                is_instrument = True
-                break
-
-        if is_instrument:
-            break
+    sorted_results = _process_scores(scores, class_names)
+    most_likely_instrument = _find_instrument(sorted_results)
     if most_likely_instrument:
         instrument_name = most_likely_instrument["class_name"]
         confidence_score = most_likely_instrument["score"]
         print(f"Detected: {instrument_name} (confidence: {confidence_score:.4f})")
-        # Save to MongoDB
         save_prediction(instrument_name, confidence_score)
     else:
         print("No specific musical instruments detected.")
-        # Still save to MongoDB with "unknown" instrument
         save_prediction("unknown", 0.0)
 
 
