@@ -37,6 +37,38 @@ def get_collection():
     return db[MONGO_COLLECTION]
 
 
+INSTRUMENT_KEYWORDS = [
+    "guitar",
+    "piano",
+    "violin",
+    "cello",
+    "flute",
+    "trumpet",
+    "saxophone",
+    "drum",
+    "bass",
+    "cymbal",
+    "harp",
+    "organ",
+    "synth",
+    "banjo",
+    "ukulele",
+    "accordion",
+    "harmonica",
+    "clarinet",
+    "trombone",
+    "tuba",
+    "fiddle",
+    "oboe",
+    "bassoon",
+    "xylophone",
+    "marimba",
+    "vibraphone",
+    "string",
+    "percussion",
+    "wind",
+]
+
 BaseOptions = mp_python.BaseOptions
 AudioClassifier = mp_audio.AudioClassifier
 AudioClassifierOptions = mp_audio.AudioClassifierOptions
@@ -117,6 +149,12 @@ def classify_wav(path: str) -> Tuple[str, float]:
         raise AudioClassificationError(f"classifier failed: {exc}") from exc
 
     head = result_list[0].classifications[0]
+    for category in head.categories:
+        label = category.category_name
+        score = float(category.score)
+        for keyword in INSTRUMENT_KEYWORDS:
+            if keyword in label.lower():
+                return label, score
     top_cat = head.categories[0]
     return top_cat.category_name, float(top_cat.score)
 
