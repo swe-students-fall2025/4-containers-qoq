@@ -1,6 +1,6 @@
-![Lint Status](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/lint.yml/badge.svg)
-![ML Client CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ml-client-ci.yml/badge.svg)
-![Web App CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/web-app-ci.yml/badge.svg)
+![Lint Status](https://github.com/swe-students-fall2025/4-containers-qoq/actions/workflows/lint.yml/badge.svg)
+![ML Client CI](https://github.com/swe-students-fall2025/4-containers-qoq/actions/workflows/ml-client-ci.yml/badge.svg)
+![Web App CI](https://github.com/swe-students-fall2025/4-containers-qoq/actions/workflows/web-app-ci.yml/badge.svg)
 
 # Instrument Classification System
 
