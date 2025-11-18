@@ -4,16 +4,23 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-flask = "*"
-pymongo = "*"
-mediapipe = "*"
-numpy = "*"
-scipy = "*"
-python-dotenv = "*"
 tomli = "*"
 typing_extensions = "*"
 pylint = "*"
 black = "*"
+flask = "*"
+pymongo = "*"
+mediapipe = "*"
+scipy = "*"
+numpy = "*"
+python-dotenv = "*"
+librosa = "*"
+soundfile = "*"
+pydub = "*"
+pytest = "*"
+pytest-flask = "*"
+pytest-cov = "*"
+coverage = "*"
 
 [dev-packages]
 
