@@ -18,6 +18,7 @@ A containerized machine learning application that uses audio classification to i
 
 
 - Siqi Zhu - [https://github.com/HelenZhutt]
+- Krystal Lin - [https://github.com/krystalll-0]
 
 ## Architecture
 
