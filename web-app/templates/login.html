@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>qoq – Log In</title>
+    <script type="module" src="https://unpkg.com/@splinetool/viewer@1.11.6/build/spline-viewer.js"></script>
+    <spline-viewer url="https://prod.spline.design/0MtMetqAoIAacdQB/scene.splinecode"></spline-viewer>`
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <spline-viewer
+        url="https://prod.spline.design/echRf7Gn5-lvxTj9/scene.splinecode"
+        style="position: fixed; top:0; left:0; width:100vw; height:100vh; z-index:0; pointer-events: auto;">
+    </spline-viewer>
+
+    <header>
+        <div class="header-logo">qoq.</div>
+        <div class="header-menu-container">
+            <button class="menu-button">Menu</button>
+            <nav class="menu-nav">
+                <a href="{{ url_for('index')}}">Home</a>
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('login') }}">Log In</a>
+                <a href="{{ url_for('signup') }}">Sign Up</a>
+            </nav>
+        </div>
+        <div></div>
+    </header>
+
+    <div class="main-content auth-page">
+        <div class="auth-card">
+            <h1 class="auth-title">Log In</h1>
+            <p class="auth-subtitle">Welcome back. Plug into qoq.</p>
+
+            {# optional flashed messages #}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="auth-messages">
+                  {% for category, message in messages %}
+                    <div class="auth-message auth-message-{{ category }}">{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('login') }}" method="post" class="auth-form">
+                <div class="auth-field">
+                    <label for="email">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        required
+                        placeholder="you@example.com"
+                    >
+                </div>
+
+                <div class="auth-field">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        placeholder="••••••••"
+                    >
+                </div>
+
+                <button type="submit" class="auth-button">Log In</button>
+            </form>
+
+            <p class="auth-footer-text">
+                Don’t have an account?
+                <a href="{{ url_for('signup') }}">Sign up</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
