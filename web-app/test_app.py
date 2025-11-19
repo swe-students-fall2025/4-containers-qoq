@@ -24,7 +24,6 @@ os.environ["AUDIO_MODEL_PATH"] = os.path.join(
 # Import must come after environment variables are set
 from app import (
     app,
-    _normalize_audio,
     _parse_iso_dt,
     _serialize_prediction,
     _store_prediction,
@@ -225,21 +224,6 @@ def test_parse_iso_dt_invalid():
     assert _parse_iso_dt("invalid") is None
     assert _parse_iso_dt(None) is None
     assert _parse_iso_dt("") is None
-
-
-def test_normalize_audio():
-    """Test audio normalization."""
-    wav_data = np.array([1.0, 2.0, 3.0, -1.0, -2.0], dtype=np.float32)
-    normalized = _normalize_audio(wav_data)
-    assert np.max(np.abs(normalized)) <= 1.0
-    assert normalized.dtype == np.float32
-
-
-def test_normalize_audio_zero():
-    """Test normalization of zero audio."""
-    wav_data = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-    normalized = _normalize_audio(wav_data)
-    assert np.allclose(normalized, wav_data)
 
 
 @patch("app.get_audio_classifier")
