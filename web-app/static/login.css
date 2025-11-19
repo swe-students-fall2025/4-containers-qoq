@@ -68,7 +68,7 @@
 }
 
 .auth-field input:focus {
-    border-color: #00ffc8;
+    border-color: #91bbe2;
     box-shadow: 0 0 8px rgba(0, 255, 200, 0.3);
 }
 
