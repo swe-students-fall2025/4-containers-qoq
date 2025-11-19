@@ -15,7 +15,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: white;
+    color: black;
     font-family: 'Share Tech Mono', monospace;
 }
 
@@ -45,7 +45,7 @@ header {
     letter-spacing: 0.1em;
     background: none;
     border: none;
-    color: white;
+    color: black;
     cursor: pointer;
 }
 
@@ -90,7 +90,7 @@ header {
 #main-title {
     font-family: 'Share Tech Mono', monospace;
     font-weight: 700;
-    color: white;
+    color: black;
     text-align: center;
     padding: 1rem;
     text-transform: uppercase;
@@ -140,7 +140,18 @@ header {
 
 .action-button-text {
     font-family: 'Share Tech Mono', monospace;
-    color: white;
+    color: black;
     text-transform: uppercase;
 }
 
+
+.white-bubble-mask {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 55vw;        
+    height: 65vh;
+    background-color: #3b6ecb;  
+    z-index: 1;              
+    pointer-events: none;
+}
