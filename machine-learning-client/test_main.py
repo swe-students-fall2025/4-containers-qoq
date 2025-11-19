@@ -171,6 +171,32 @@ def test_save_prediction_failure(monkeypatch, capsys):
     assert "Error saving to MongoDB" in captured.out
 
 
+def test_classify_waveform_returns_none_if_model_missing(monkeypatch):
+    """classify_waveform should return None immediately if model is None."""
+    monkeypatch.setattr(main, "model", None)
+    result = main.classify_waveform(np.zeros(100))
+    assert result is None
+
+
+def test_classify_waveform_returns_none_if_no_allowed_instrument(monkeypatch):
+    """classify_waveform, returns None if detected classes are not in ALLOWED_INSTRUMENTS."""
+    monkeypatch.setattr(main, "CLASS_NAMES", ["Dog", "Cat", "Guitar"])
+
+    class DummyScores:  # pylint: disable=too-few-public-methods
+        """Dummy scores"""
+
+        def numpy(self):
+            """mock numpy"""
+            return np.array([[0.9, 0.05, 0.001]])
+
+    monkeypatch.setattr(main, "model", lambda x: (DummyScores(), None, None))
+    monkeypatch.setattr(main, "ALLOWED_INSTRUMENTS", {"Guitar"})
+
+    result = main.classify_waveform(np.zeros(100))
+
+    assert result is None
+
+
 # ---------------------------------------------------------------------------
 # Tests for main.main orchestrator
 # ---------------------------------------------------------------------------
