@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: web-app
     ports:
-      - "5000:5000"
+      - "5001:5000"
     depends_on:
       mongodb:
         condition: service_healthy

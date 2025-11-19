@@ -10,7 +10,16 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import librosa
 from pydub import AudioSegment
-from flask import Flask, jsonify, render_template, request
+from flask import (
+    Flask,
+    jsonify,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session,
+)
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
@@ -19,6 +28,7 @@ from mediapipe.tasks.python import audio as mp_audio
 from mediapipe.tasks.python.components import containers as mp_containers
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongodb:27017")
 MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "ml_logs")
@@ -36,6 +46,7 @@ def get_collection():
     db = _get_mongo_client()[MONGO_DB_NAME]
     return db[MONGO_COLLECTION]
 
+USERS: Dict[str, str] = {}
 
 INSTRUMENT_KEYWORDS = [
     "guitar",
@@ -214,17 +225,66 @@ def _store_prediction(
     doc["_id"] = result.inserted_id
     return _serialize_prediction(doc)
 
-
-@app.route("/", methods=["GET"])
-def index():
-    """Render the landing page."""
-    return render_template("index.html")
+@app.route("/")
+def root():
+    """Always send users to the login screen first."""
+    return redirect(url_for("login"))
 
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     """Render the dashboard shell (data fetched via AJAX)."""
     return render_template("dashboard.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Log in page. On success, go to main index."""
+    if request.method == "POST":
+        email = request.form.get("email", "")
+        password = request.form.get("password", "")
+
+        # TODO: real auth; for now accept anything non-empty
+        if email and password:
+            return redirect(url_for("index"))
+
+        flash("Invalid email or password", "error")
+        return redirect(url_for("login"))
+
+    return render_template("login.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    """Sign up page. On success, go back to login."""
+    if request.method == "POST":
+        email = request.form.get("email", "")
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if not email or not password:
+            flash("Email and password are required", "error")
+        elif password != confirm:
+            flash("Passwords do not match", "error")
+        else:
+            # TODO: save user to DB / file if your assignment wants that
+            flash("Account created. Please log in.", "success")
+            return redirect(url_for("login"))
+
+    return render_template("signup.html")
+
+@app.route("/home")
+def index():
+    """Main landing page after login."""
+    return render_template("index.html")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    """Clear session and send user back to login."""
+    session.pop("user_email", None)
+    flash("Logged out.", "success")
+    return redirect(url_for("login"))
 
 
 @app.route("/api/predictions", methods=["POST"])
