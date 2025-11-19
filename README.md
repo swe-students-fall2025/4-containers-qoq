@@ -124,9 +124,14 @@ Then open `http://localhost:5000` in your browser.
 
 You can create a `.env` file in the project root to override default environment variables.
 
-Notes:
+**To get started:**
+1. Copy the example file: `cp env.example .env`
+2. Edit `.env` and update values as needed for your environment
+
+**Notes:**
 - If `.env` is not present, Compose uses the defaults specified in `docker-compose.yml`.
 - You can change paths, port, or database settings.
+- The `.env` file is ignored by git (see `.gitignore`) to keep your configuration private.
 
 ```env
 # MongoDB Configuration
@@ -283,8 +288,8 @@ pytest --cov=. --cov-report=html
 The project uses GitHub Actions for continuous integration:
 
 - **Linting**: Runs on every push and pull request
-- **ML Client CI**: Builds and tests the ML client (TODO: create workflow)
-- **Web App CI**: Builds and tests the web app (TODO: create workflow)
+- **ML Client CI**: Builds and tests the ML client on every push/PR to `main` branch
+- **Web App CI**: Builds and tests the web app on every push/PR to `main` branch
 
 ## Troubleshooting
 

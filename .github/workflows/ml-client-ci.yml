@@ -44,7 +44,7 @@ jobs:
         working-directory: ./machine-learning-client
         run: |
           coverage run --source=. -m pytest
-          coverage report --fail-under=80 || true
+          coverage report --fail-under=80
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
