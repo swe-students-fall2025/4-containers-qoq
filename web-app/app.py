@@ -230,7 +230,7 @@ def _store_prediction(
 @app.route("/")
 def root():
     """Always send users to the login screen first."""
-    return redirect(url_for("login"))
+    return render_template("login.html")
 
 
 @app.route("/dashboard", methods=["GET"])
@@ -247,10 +247,10 @@ def login():
         password = request.form.get("password", "")
 
         if email and password:
-            return redirect(url_for("index"))
+            return render_template("index.html")
 
         flash("Invalid email or password", "error")
-        return redirect(url_for("login"))
+        return render_template("login.html")
 
     return render_template("login.html")
 
@@ -269,7 +269,7 @@ def signup():
             flash("Passwords do not match", "error")
         else:
             flash("Account created. Please log in.", "success")
-            return redirect(url_for("login"))
+            return render_template("login.html")
 
     return render_template("signup.html")
 
@@ -285,7 +285,7 @@ def logout():
     """Clear session and send user back to login."""
     session.pop("user_email", None)
     flash("Logged out.", "success")
-    return redirect(url_for("login"))
+    return render_template("login.html")
 
 
 @app.route("/api/predictions", methods=["POST"])
