@@ -68,7 +68,7 @@
 }
 
 .auth-field input:focus {
-    border-color: #00ffc8;
+    border-color: #91bbe2;
     box-shadow: 0 0 8px rgba(0, 255, 200, 0.3);
 }
 
@@ -80,7 +80,7 @@
     margin-top: 10px;
     width: 100%;
     padding: 12px;
-    background: #00ffc8;
+    background: #91bbe2;
     color: black;
     font-weight: 700;
     border-radius: 8px;
@@ -90,7 +90,7 @@
 }
 
 .auth-button:hover {
-    background: #07e6b4;
+    background: #6fa8dc;
     transform: translateY(-2px);
 }
 
@@ -111,7 +111,7 @@
 
 .auth-message-success {
     background: rgba(0, 255, 150, 0.15);
-    color: #00ff99;
+    color: #91bbe2;
 }
 
 .auth-message-error {
@@ -131,7 +131,7 @@
 }
 
 .auth-footer-text a {
-    color: #00ffc8;
+    color: #91bbe2;
     text-decoration: none;
 }
 
