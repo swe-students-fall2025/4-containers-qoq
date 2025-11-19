@@ -167,7 +167,8 @@ def test_process_scores_sorts_descending():
     dummy_scores = DummyScores(scores_array)
     class_names = ["class_a", "class_b", "class_c"]
 
-    results = main._process_scores(dummy_scores, class_names)  # pylint: disable=protected-access
+    # pylint: disable=protected-access
+    results = main._process_scores(dummy_scores, class_names)
 
     # Highest should be class_b with 0.7
     assert results[0]["class_name"] == "class_b"
@@ -241,7 +242,6 @@ def test_main_exits_early_if_audio_missing(monkeypatch, tmp_path, capsys):
 
     captured = capsys.readouterr()
     assert f"Error: {missing_audio} not found." in captured.out
-
 
 
 def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, capsys):
