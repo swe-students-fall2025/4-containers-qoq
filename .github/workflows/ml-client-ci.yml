@@ -45,7 +45,8 @@ jobs:
       - name: Run tests with coverage
         working-directory: ./machine-learning-client
         run: |
-          coverage run --source=. --omit='*/test_*.py,*/__pycache__/*,*/site-packages/*' -m pytest
+          coverage erase
+          coverage run --source=. --omit='*/test_*.py,*/__pycache__/*,*/site-packages/*' --ignore-errors -m pytest
           coverage report --fail-under=80
 
       - name: Set up Docker Buildx
