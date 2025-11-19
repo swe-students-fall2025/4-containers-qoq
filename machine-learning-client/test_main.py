@@ -79,6 +79,32 @@ def test_load_audio_calls_librosa_and_returns_waveform(monkeypatch):
     assert np.allclose(result, fake_waveform)
 
 
+def test_get_collection_returns_correct_collection(monkeypatch):
+    """Test that get_collection returns the mongo collection object from the client."""
+
+    class MockDB:  # pylint: disable=too-few-public-methods
+        """Mock MongoDB database."""
+
+        def __getitem__(self, name):
+            return f"CollectionObject({name})"
+
+    class MockClient:  # pylint: disable=too-few-public-methods
+        """Mock MongoDB client."""
+
+        def __getitem__(self, name):
+            if name == "test_db":
+                return MockDB()
+            return None
+
+    monkeypatch.setattr(main, "mongo_client", MockClient())
+    monkeypatch.setattr(main, "MONGO_DB_NAME", "test_db")
+    monkeypatch.setattr(main, "MONGO_COLLECTION", "test_col")
+
+    col = main.get_collection()
+
+    assert col == "CollectionObject(test_col)"
+
+
 # ---------------------------------------------------------------------------
 # Tests for save_prediction
 # ---------------------------------------------------------------------------
