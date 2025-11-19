@@ -69,7 +69,6 @@ def test_load_audio_calls_librosa_and_returns_waveform(monkeypatch):
         assert mono is True
         return fake_waveform, sr
 
-
     monkeypatch.setattr(main.librosa, "load", fake_load)
     monkeypatch.setattr(main.librosa.util, "normalize", lambda x: x)
 
