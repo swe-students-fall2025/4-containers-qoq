@@ -73,6 +73,7 @@ def test_dashboard(test_client):
     response = test_client.get("/dashboard")
     assert response.status_code == 200
 
+
 def test_login_get_renders_page(test_client):
     """GET /login should return the login page."""
     resp = test_client.get("/login")
