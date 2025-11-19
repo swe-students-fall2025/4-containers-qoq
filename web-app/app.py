@@ -46,6 +46,7 @@ def get_collection():
     db = _get_mongo_client()[MONGO_DB_NAME]
     return db[MONGO_COLLECTION]
 
+
 USERS: Dict[str, str] = {}
 
 INSTRUMENT_KEYWORDS = [
@@ -225,6 +226,7 @@ def _store_prediction(
     doc["_id"] = result.inserted_id
     return _serialize_prediction(doc)
 
+
 @app.route("/")
 def root():
     """Always send users to the login screen first."""
@@ -244,7 +246,6 @@ def login():
         email = request.form.get("email", "")
         password = request.form.get("password", "")
 
-        # TODO: real auth; for now accept anything non-empty
         if email and password:
             return redirect(url_for("index"))
 
@@ -267,11 +268,11 @@ def signup():
         elif password != confirm:
             flash("Passwords do not match", "error")
         else:
-            # TODO: save user to DB / file if your assignment wants that
             flash("Account created. Please log in.", "success")
             return redirect(url_for("login"))
 
     return render_template("signup.html")
+
 
 @app.route("/home")
 def index():
