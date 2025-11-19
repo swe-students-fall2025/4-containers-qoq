@@ -431,8 +431,6 @@ def test_main_exits_if_audio_load_fails(monkeypatch, tmp_path, capsys):
     class DummyModel:  # pylint: disable=too-few-public-methods
         """Dummy model for testing."""
 
-        pass
-
     def fake_hub_load(_url):  # noqa: ARG001
         return DummyModel()
 
@@ -459,7 +457,8 @@ def test_main_saves_unknown_when_no_instrument_detected(monkeypatch, tmp_path, c
     monkeypatch.setattr(main, "AUDIO_FILE", str(audio_path))
 
     def fake_load_class_map():
-        return ["guitar", "piano"]
+        # Use class names that don't match instrument keywords
+        return ["speech", "noise", "music"]
 
     monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
 
@@ -479,6 +478,7 @@ def test_main_saves_unknown_when_no_instrument_detected(monkeypatch, tmp_path, c
 
         def __call__(self, waveform):  # noqa: ARG002
             """Return dummy scores."""
+            # Return 3 scores to match 3 class names
             scores = DummyScores(np.array([[0.5, 0.3, 0.2]]))
             return scores, None, None
 
@@ -502,7 +502,7 @@ def test_main_saves_unknown_when_no_instrument_detected(monkeypatch, tmp_path, c
         return True
 
     monkeypatch.setattr(main, "save_prediction", fake_save_prediction)
-    monkeypatch.setattr(main, "INSTRUMENT_KEYWORDS", ["guitar", "piano"])
+    # Keep default INSTRUMENT_KEYWORDS - they won't match "speech", "noise", "music"
 
     main.main()
 
