@@ -48,8 +48,8 @@ jobs:
       - name: Run tests with coverage
         working-directory: ./web-app
         run: |
-          coverage run --source=. -m pytest
-          coverage report --fail-under=80 || true
+          coverage run --source=. --omit='*/test_*.py,*/__pycache__/*,*/site-packages/*' -m pytest
+          coverage report --fail-under=80
 
 
 
