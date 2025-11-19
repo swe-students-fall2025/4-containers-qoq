@@ -21,6 +21,15 @@
             <h1 class="auth-title">Create account</h1>
             <p class="auth-subtitle">Join qoq to start detecting instruments.</p>
 
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class="flashes" style="list-style: none; padding: 0; color: red; margin-bottom: 1rem;">
+                    {% for category, message in messages %}
+                         <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
             <form method="POST" action="{{ url_for('signup') }}" class="auth-form">
                 <div class="auth-field">
                     <label for="email">Email</label>

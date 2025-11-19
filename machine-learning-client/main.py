@@ -19,37 +19,76 @@ MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "ml_logs")
 MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "predictions")
 SOURCE_NAME = os.environ.get("SOURCE_NAME", "ml-client")
 
-INSTRUMENT_KEYWORDS = [
-    "guitar",
-    "piano",
-    "violin",
-    "cello",
-    "flute",
-    "trumpet",
-    "saxophone",
-    "drum",
-    "bass",
-    "cymbal",
-    "harp",
-    "organ",
-    "synth",
-    "banjo",
-    "ukulele",
-    "accordion",
-    "harmonica",
-    "clarinet",
-    "trombone",
-    "tuba",
-    "fiddle",
-    "oboe",
-    "bassoon",
-    "xylophone",
-    "marimba",
-    "vibraphone",
-    "string",
-    "percussion",
-    "wind",
-]
+mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+
+ALLOWED_INSTRUMENTS = {
+    "Guitar",
+    "Electric guitar",
+    "Bass guitar",
+    "Acoustic guitar",
+    "Steel guitar, slide guitar",
+    "Banjo",
+    "Sitar",
+    "Mandolin",
+    "Zither",
+    "Ukulele",
+    "Piano",
+    "Electric piano",
+    "Organ",
+    "Electronic organ",
+    "Hammond organ",
+    "Synthesizer",
+    "Sampler",
+    "Harpsichord",
+    "Drum kit",
+    "Drum machine",
+    "Drum",
+    "Snare drum",
+    "Bass drum",
+    "Timpani",
+    "Tabla",
+    "Cymbal",
+    "Hi-hat",
+    "Wood block",
+    "Tambourine",
+    "Rattle (instrument)",
+    "Maraca",
+    "Gong",
+    "Tubular bells",
+    "Marimba, xylophone",
+    "Glockenspiel",
+    "Vibraphone",
+    "Steelpan",
+    "French horn",
+    "Trumpet",
+    "Trombone",
+    "Violin, fiddle",
+    "Cello",
+    "Double bass",
+    "Flute",
+    "Saxophone",
+    "Clarinet",
+    "Harp",
+    "Bell",
+    "Church bell",
+    "Jingle bell",
+    "Chime",
+    "Wind chime",
+    "Harmonica",
+    "Accordion",
+    "Bagpipes",
+    "Didgeridoo",
+    "Shofar",
+    "Theremin",
+    "Singing bowl",
+}
+
+try:
+    model = hub.load("https://tfhub.dev/google/yamnet/1")
+    print("Model loaded successfully.")
+except (OSError, RuntimeError) as e:
+    print(f"Error loading model: {e}")
+    model = None
 
 
 def load_class_map():
@@ -78,10 +117,14 @@ def load_class_map():
         return None
 
 
+CLASS_NAMES = load_class_map()
+
+
 def load_audio(file_path, target_sr):
     """Load audio file to target sample rate"""
     try:
         waveform, _ = librosa.load(file_path, sr=target_sr, mono=True)
+        waveform = librosa.util.normalize(waveform)
         return waveform
     except FileNotFoundError:
         print(f"Error: Audio file not found at '{file_path}'")
@@ -93,8 +136,7 @@ def load_audio(file_path, target_sr):
 
 def get_collection():
     """Return the MongoDB collection used to store predictions."""
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    db = client[MONGO_DB_NAME]
+    db = mongo_client[MONGO_DB_NAME]
     return db[MONGO_COLLECTION]
 
 
@@ -112,62 +154,43 @@ def save_prediction(instrument, confidence):
         col = get_collection()
         result = col.insert_one(doc)
         print(f"Saved prediction to MongoDB with ID: {result.inserted_id}")
-        return True
     except (OSError, RuntimeError, ValueError) as e:
         print(f"Error saving to MongoDB: {e}")
-        return False
 
 
-def _process_scores(scores, class_names):
-    """Process model scores and return sorted results."""
-    mean_scores = np.mean(scores.numpy(), axis=0)
+def classify_waveform(waveform):
+    """Classify the audio file and return sorted results."""
+    if model is None:
+        return None
+    scores, _, _ = model(waveform)
+    processed_scores = np.mean(scores.numpy(), axis=0)
     results = []
-    for i, score in enumerate(mean_scores):
-        results.append({"class_name": class_names[i], "score": score})
-    return sorted(results, key=lambda x: x["score"], reverse=True)
-
-
-def _find_instrument(sorted_results):
-    """Find the most likely instrument from sorted results."""
+    for i, score in enumerate(processed_scores):
+        results.append({"class_name": CLASS_NAMES[i], "score": score})
+    sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
     for res in sorted_results:
-        if res["score"] < 0.01:
+        if res["score"] < 0.005:
             break
-        for keyword in INSTRUMENT_KEYWORDS:
-            if keyword in res["class_name"].lower():
-                return res
+        if res["class_name"] in ALLOWED_INSTRUMENTS:
+            return res
     return None
 
 
 def main():
-    """Main function to detect instrument"""
+    """Main function"""
     if not os.path.exists(AUDIO_FILE):
         print(f"Error: {AUDIO_FILE} not found.")
         return
-    class_names = load_class_map()
-    if not class_names:
-        return
-    print("Loading YAMNet model.")
-    try:
-        model = hub.load("https://tfhub.dev/google/yamnet/1")
-        print("Model loaded successfully.")
-    except (OSError, RuntimeError) as e:
-        print(f"Error loading model: {e}")
-        return
     print(f"Loading audio from {AUDIO_FILE}.")
     waveform = load_audio(AUDIO_FILE, TARGET_SAMPLE_RATE)
-    if waveform is None:
-        return
-    scores, _, _ = model(waveform)
-    sorted_results = _process_scores(scores, class_names)
-    most_likely_instrument = _find_instrument(sorted_results)
-    if most_likely_instrument:
-        instrument_name = most_likely_instrument["class_name"]
-        confidence_score = most_likely_instrument["score"]
-        print(f"Detected: {instrument_name} (confidence: {confidence_score:.4f})")
-        save_prediction(instrument_name, confidence_score)
-    else:
-        print("No specific musical instruments detected.")
-        save_prediction("unknown", 0.0)
+    if waveform is not None:
+        result = classify_waveform(waveform)
+        if result:
+            print(f"Detected: {result['class_name']} ({result['score']:.4f})")
+            save_prediction(result["class_name"], result["score"])
+        else:
+            print("No specific musical instruments detected.")
+            save_prediction("unknown", 0.0)
 
 
 if __name__ == "__main__":
