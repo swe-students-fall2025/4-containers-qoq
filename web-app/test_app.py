@@ -74,6 +74,36 @@ def test_dashboard(test_client):
     assert response.status_code == 200
 
 
+def test_login_get_renders_page(test_client):
+    """GET /login should return the login page."""
+    resp = test_client.get("/login")
+    assert resp.status_code == 200
+    assert b"Log In" in resp.data
+
+
+def test_signup_get_renders_page(test_client):
+    """GET /signup should return the signup page."""
+    resp = test_client.get("/signup")
+    assert resp.status_code == 200
+    assert b"Create account" in resp.data
+
+
+def test_login_post_success_renders_index(test_client):
+    """POST /login with non-empty credentials should render the index page."""
+    resp = test_client.post(
+        "/login",
+        data={"email": "user@example.com", "password": "secret"},
+        follow_redirects=False,
+    )
+
+    # Because you're using render_template, this should be 200, not 302
+    assert resp.status_code == 200
+
+    # Check for something that clearly belongs to index.html
+    # e.g. the main title "Detecting"
+    assert b"Detecting" in resp.data
+
+
 def test_health_ok(mock_mongo_collection):
     """Test health check when MongoDB is connected."""
     mock_mongo_collection.find_one.return_value = {}
