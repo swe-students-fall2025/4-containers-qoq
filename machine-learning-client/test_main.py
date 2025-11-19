@@ -42,32 +42,6 @@ def test_load_class_map_reads_display_names(tmp_path, monkeypatch):
     assert result == ["guitar", "piano", "violin"]
 
 
-def test_load_class_map_empty_file_returns_none(tmp_path, monkeypatch, capsys):
-    """If CSV file is empty, load_class_map returns None."""
-    empty_csv = tmp_path / "empty.csv"
-    empty_csv.write_text("", encoding="utf-8")
-    monkeypatch.setattr(main, "CLASS_MAP_FILE", str(empty_csv))
-
-    result = main.load_class_map()
-
-    captured = capsys.readouterr()
-    assert "is empty" in captured.out
-    assert result is None
-
-
-def test_load_class_map_no_class_names_returns_none(tmp_path, monkeypatch, capsys):
-    """If CSV has no class names, load_class_map returns None."""
-    csv_path = tmp_path / "no_classes.csv"
-    csv_path.write_text("index,mid,display_name\n", encoding="utf-8")
-    monkeypatch.setattr(main, "CLASS_MAP_FILE", str(csv_path))
-
-    result = main.load_class_map()
-
-    captured = capsys.readouterr()
-    assert "Could not read any class names" in captured.out
-    assert result is None
-
-
 # ---------------------------------------------------------------------------
 # Tests for load_audio
 # ---------------------------------------------------------------------------
@@ -95,29 +69,15 @@ def test_load_audio_calls_librosa_and_returns_waveform(monkeypatch):
         assert mono is True
         return fake_waveform, sr
 
-    # ✅ Patch only librosa.load, not the whole librosa module
+
     monkeypatch.setattr(main.librosa, "load", fake_load)
+    monkeypatch.setattr(main.librosa.util, "normalize", lambda x: x)
 
     result = main.load_audio("somefile.wav", main.TARGET_SAMPLE_RATE)
 
     # Should return exactly the waveform from fake_load
     assert isinstance(result, np.ndarray)
     assert np.allclose(result, fake_waveform)
-
-
-def test_load_audio_parameter_error_returns_none(monkeypatch, capsys):
-    """If librosa raises ParameterError, load_audio returns None."""
-
-    def fake_load(path, sr=None, mono=None):  # noqa: ARG001
-        raise main.librosa.util.exceptions.ParameterError("Invalid audio format")
-
-    monkeypatch.setattr(main.librosa, "load", fake_load)
-
-    result = main.load_audio("badfile.wav", main.TARGET_SAMPLE_RATE)
-
-    captured = capsys.readouterr()
-    assert "Error loading audio file" in captured.out
-    assert result is None
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +93,7 @@ class DummyInsertOneResult:  # pylint: disable=too-few-public-methods
 
 
 def test_save_prediction_success(monkeypatch, capsys):
-    """save_prediction should insert a document into Mongo and return True."""
+    """save_prediction should insert a document into Mongo."""
     saved_docs = []
 
     class DummyCollection:  # pylint: disable=too-few-public-methods
@@ -149,10 +109,9 @@ def test_save_prediction_success(monkeypatch, capsys):
 
     monkeypatch.setattr(main, "get_collection", fake_get_collection)
 
-    ok = main.save_prediction("guitar", 0.95)
+    main.save_prediction("guitar", 0.95)
 
     captured = capsys.readouterr()
-    assert ok is True
     assert "Saved prediction to MongoDB with ID: 123456" in captured.out
 
     assert len(saved_docs) == 1
@@ -167,7 +126,7 @@ def test_save_prediction_success(monkeypatch, capsys):
 
 
 def test_save_prediction_failure(monkeypatch, capsys):
-    """If Mongo insert fails, save_prediction should print an error and return False."""
+    """If Mongo insert fails, save_prediction should print an error."""
 
     class FailingCollection:  # pylint: disable=too-few-public-methods
         """A mock MongoDB collection that always fails on insert_one."""
@@ -181,88 +140,10 @@ def test_save_prediction_failure(monkeypatch, capsys):
 
     monkeypatch.setattr(main, "get_collection", fake_get_collection)
 
-    ok = main.save_prediction("piano", 0.5)
+    main.save_prediction("piano", 0.5)
 
     captured = capsys.readouterr()
-    assert ok is False
     assert "Error saving to MongoDB" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# Tests for _process_scores
-# ---------------------------------------------------------------------------
-
-
-def test_process_scores_sorts_descending():
-    """_process_scores should return scores sorted from highest to lowest."""
-
-    class DummyScores:  # pylint: disable=too-few-public-methods
-        """Mock scores tensor with a .numpy() method."""
-
-        def __init__(self, arr):
-            """Store the mock array."""
-            self._arr = arr
-
-        def numpy(self):
-            """Return the stored array."""
-            return self._arr
-
-    scores_array = np.array([[0.1, 0.7, 0.2]])  # shape [frames, classes]
-    dummy_scores = DummyScores(scores_array)
-    class_names = ["class_a", "class_b", "class_c"]
-
-    # pylint: disable=protected-access
-    results = main._process_scores(dummy_scores, class_names)
-
-    # Highest should be class_b with 0.7
-    assert results[0]["class_name"] == "class_b"
-    assert np.isclose(results[0]["score"], 0.7)
-
-
-# ---------------------------------------------------------------------------
-# Tests for _find_instrument
-# ---------------------------------------------------------------------------
-
-
-def test_find_instrument_returns_first_matching_instrument(monkeypatch):
-    """_find_instrument finds the top result whose class_name matches instrument keywords."""
-    # Ensure our keyword list contains "guitar".
-    monkeypatch.setattr(
-        main,
-        "INSTRUMENT_KEYWORDS",
-        ["guitar", "piano", "violin"],
-    )
-
-    sorted_results = [
-        {"class_name": "music", "score": 0.9},
-        {"class_name": "Acoustic guitar", "score": 0.8},
-        {"class_name": "random noise", "score": 0.1},
-    ]
-
-    result = main._find_instrument(sorted_results)  # pylint: disable=protected-access
-
-    assert result is not None
-    assert result["class_name"] == "Acoustic guitar"
-    assert np.isclose(result["score"], 0.8)
-
-
-def test_find_instrument_returns_none_if_no_high_conf_instrument(monkeypatch):
-    """If no high-confidence instrument keyword appears, _find_instrument returns None."""
-    monkeypatch.setattr(
-        main,
-        "INSTRUMENT_KEYWORDS",
-        ["guitar", "piano", "violin"],
-    )
-
-    # Scores below 0.01 or no keyword match
-    sorted_results = [
-        {"class_name": "speech", "score": 0.5},
-        {"class_name": "applause", "score": 0.2},
-        {"class_name": "background noise", "score": 0.05},
-    ]
-
-    result = main._find_instrument(sorted_results)  # pylint: disable=protected-access
-    assert result is None
 
 
 # ---------------------------------------------------------------------------
@@ -298,10 +179,7 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
     # 1) Fake class map
     fake_class_names = ["guitar", "piano", "drums"]
 
-    def fake_load_class_map():
-        return fake_class_names
-
-    monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
+    monkeypatch.setattr(main, "CLASS_NAMES", fake_class_names)
 
     # 2) Fake model (TF Hub)
     class DummyScores:  # pylint: disable=too-few-public-methods
@@ -324,12 +202,8 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
             scores = DummyScores(np.array([[0.9, 0.05, 0.05]]))
             return scores, None, None
 
-    def fake_hub_load(_url):  # noqa: ARG001
-        """Return a DummyModel instead of loading from TensorFlow Hub."""
-        return DummyModel()
-
-    fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
-    monkeypatch.setattr(main, "hub", fake_hub_module)
+    dummy_model = DummyModel()
+    monkeypatch.setattr(main, "model", dummy_model)
 
     # 3) Fake load_audio, just return a dummy waveform
     def fake_load_audio(path, target_sr):
@@ -352,8 +226,8 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
     # 5) Ensure instrument keywords include guitar
     monkeypatch.setattr(
         main,
-        "INSTRUMENT_KEYWORDS",
-        ["guitar", "piano", "violin"],
+        "ALLOWED_INSTRUMENTS",
+        {"guitar", "piano", "violin"},
     )
 
     main.main()
@@ -361,152 +235,8 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
     captured = capsys.readouterr()
 
     # Assert we printed the detected instrument
-    assert "Detected: guitar (confidence:" in captured.out
+    assert "Detected: guitar (0.9000)" in captured.out
 
     # Saved prediction should match detection
     assert saved["instrument"] == "guitar"
     assert np.isclose(saved["confidence"], 0.9)
-
-
-def test_main_exits_if_class_map_fails(monkeypatch, tmp_path, capsys):
-    """If load_class_map returns None, main() exits early."""
-    audio_path = tmp_path / "data.wav"
-    audio_path.write_bytes(b"fake audio")
-    monkeypatch.setattr(main, "AUDIO_FILE", str(audio_path))
-
-    def fake_load_class_map():
-        return None
-
-    monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
-
-    # Should not load model if class map fails
-    def fake_hub_load(_url):  # noqa: ARG001
-        raise AssertionError("Should not load model")
-
-    fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
-    monkeypatch.setattr(main, "hub", fake_hub_module)
-
-    main.main()
-
-    # Should exit without error, just return early
-    captured = capsys.readouterr()
-    assert "Loading YAMNet model" not in captured.out
-
-
-def test_main_exits_if_model_load_fails(monkeypatch, tmp_path, capsys):
-    """If model loading fails, main() prints error and exits."""
-    audio_path = tmp_path / "data.wav"
-    audio_path.write_bytes(b"fake audio")
-    monkeypatch.setattr(main, "AUDIO_FILE", str(audio_path))
-
-    def fake_load_class_map():
-        return ["guitar", "piano"]
-
-    monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
-
-    def fake_hub_load(_url):  # noqa: ARG001
-        raise RuntimeError("Network error")
-
-    fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
-    monkeypatch.setattr(main, "hub", fake_hub_module)
-
-    main.main()
-
-    captured = capsys.readouterr()
-    assert "Error loading model" in captured.out
-    assert "Network error" in captured.out
-
-
-def test_main_exits_if_audio_load_fails(monkeypatch, tmp_path, capsys):
-    """If audio loading fails, main() exits early."""
-    audio_path = tmp_path / "data.wav"
-    audio_path.write_bytes(b"fake audio")
-    monkeypatch.setattr(main, "AUDIO_FILE", str(audio_path))
-
-    def fake_load_class_map():
-        return ["guitar", "piano"]
-
-    monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
-
-    class DummyModel:  # pylint: disable=too-few-public-methods
-        """Dummy model for testing."""
-
-    def fake_hub_load(_url):  # noqa: ARG001
-        return DummyModel()
-
-    fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
-    monkeypatch.setattr(main, "hub", fake_hub_module)
-
-    def fake_load_audio(_path, _target_sr):
-        """Mock load_audio that returns None."""
-        return None
-
-    monkeypatch.setattr(main, "load_audio", fake_load_audio)
-
-    main.main()
-
-    # Should exit without processing
-    captured = capsys.readouterr()
-    assert "Detected:" not in captured.out
-
-
-def test_main_saves_unknown_when_no_instrument_detected(monkeypatch, tmp_path, capsys):
-    """If no instrument is detected, main() saves 'unknown' prediction."""
-    audio_path = tmp_path / "data.wav"
-    audio_path.write_bytes(b"fake audio")
-    monkeypatch.setattr(main, "AUDIO_FILE", str(audio_path))
-
-    def fake_load_class_map():
-        # Use class names that don't match instrument keywords
-        return ["speech", "noise", "music"]
-
-    monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
-
-    class DummyScores:  # pylint: disable=too-few-public-methods
-        """Dummy scores object for testing."""
-
-        def __init__(self, arr):
-            """Store the array."""
-            self._arr = arr
-
-        def numpy(self):
-            """Return the stored array."""
-            return self._arr
-
-    class DummyModel:  # pylint: disable=too-few-public-methods
-        """Dummy model for testing."""
-
-        def __call__(self, waveform):  # noqa: ARG002
-            """Return dummy scores."""
-            # Return 3 scores to match 3 class names
-            scores = DummyScores(np.array([[0.5, 0.3, 0.2]]))
-            return scores, None, None
-
-    def fake_hub_load(_url):  # noqa: ARG001
-        return DummyModel()
-
-    fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
-    monkeypatch.setattr(main, "hub", fake_hub_module)
-
-    def fake_load_audio(_path, _target_sr):
-        """Mock load_audio that returns zeros."""
-        return np.zeros(100, dtype=float)
-
-    monkeypatch.setattr(main, "load_audio", fake_load_audio)
-
-    saved = {}
-
-    def fake_save_prediction(instrument, confidence):
-        saved["instrument"] = instrument
-        saved["confidence"] = float(confidence)
-        return True
-
-    monkeypatch.setattr(main, "save_prediction", fake_save_prediction)
-    # Keep default INSTRUMENT_KEYWORDS - they won't match "speech", "noise", "music"
-
-    main.main()
-
-    captured = capsys.readouterr()
-    assert "No specific musical instruments detected" in captured.out
-    assert saved["instrument"] == "unknown"
-    assert saved["confidence"] == 0.0

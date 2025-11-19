@@ -1,14 +1,6 @@
-Flask
-pymongo
-mediapipe
-scipy
-numpy
-python-dotenv
-librosa
-soundfile
-pydub
-pytest
 pytest-flask
 pytest-cov
 coverage
 pylint
+pylint
+tensorflow_hub

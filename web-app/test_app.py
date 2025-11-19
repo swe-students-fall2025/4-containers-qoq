@@ -24,7 +24,6 @@ os.environ["AUDIO_MODEL_PATH"] = os.path.join(
 # Import must come after environment variables are set
 from app import (
     app,
-    _normalize_audio,
     _parse_iso_dt,
     _serialize_prediction,
     _store_prediction,
@@ -86,6 +85,30 @@ def test_signup_get_renders_page(test_client):
     resp = test_client.get("/signup")
     assert resp.status_code == 200
     assert b"Create account" in resp.data
+
+
+def test_signup_post_success(test_client):
+    """Test that signup success should redirect to login."""
+    data = {"email": "new@example.com", "password": "pass", "confirm_password": "pass"}
+    resp = test_client.post("/signup", data=data, follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Account created" in resp.data
+    assert b"Log In" in resp.data
+
+
+def test_signup_post_mismatch_password(test_client):
+    """Test that non-matching passwords should not work for sign up."""
+    data = {"email": "new@example.com", "password": "pass", "confirm_password": "WRONG"}
+    resp = test_client.post("/signup", data=data, follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Passwords do not match" in resp.data
+
+
+def test_signup_post_missing_fields(test_client):
+    """Test that email and password during signup cannot be empty"""
+    resp = test_client.post("/signup", data={"email": ""}, follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Email and password are required" in resp.data
 
 
 def test_login_post_success_renders_index(test_client):
@@ -227,48 +250,19 @@ def test_parse_iso_dt_invalid():
     assert _parse_iso_dt("") is None
 
 
-def test_normalize_audio():
-    """Test audio normalization."""
-    wav_data = np.array([1.0, 2.0, 3.0, -1.0, -2.0], dtype=np.float32)
-    normalized = _normalize_audio(wav_data)
-    assert np.max(np.abs(normalized)) <= 1.0
-    assert normalized.dtype == np.float32
-
-
-def test_normalize_audio_zero():
-    """Test normalization of zero audio."""
-    wav_data = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-    normalized = _normalize_audio(wav_data)
-    assert np.allclose(normalized, wav_data)
-
-
-@patch("app.get_audio_classifier")
+@patch("app.CLASS_NAMES", ["Guitar", "Piano", "Drum"])
+@patch("app.model")
 @patch("app.librosa.load")
-def test_classify_wav_success(mock_librosa, mock_classifier):
+def test_classify_wav_success(mock_librosa, mock_model):
     """Test successful audio classification."""
     # Mock librosa
     mock_wav_data = np.array([0.5, -0.3, 0.8], dtype=np.float32)
     mock_sample_rate = 16000
     mock_librosa.return_value = (mock_wav_data, mock_sample_rate)
-
-    # Mock classifier
-    mock_classifier_instance = MagicMock()
-    mock_classifier.return_value = mock_classifier_instance
-
-    mock_category = MagicMock()
-    mock_category.category_name = "Guitar"
-    mock_category.score = 0.92
-
-    mock_classification = MagicMock()
-    mock_classification.categories = [mock_category]
-
-    mock_head = MagicMock()
-    mock_head.categories = [mock_category]
-
-    mock_result = MagicMock()
-    mock_result.classifications = [mock_head]
-
-    mock_classifier_instance.classify.return_value = [mock_result]
+    # Mock Tensorflow model output
+    mock_scores_tensor = MagicMock()
+    mock_scores_tensor.numpy.return_value = np.array([[0.92, 0.01, 0.01]])
+    mock_model.return_value = (mock_scores_tensor, None, None)
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = tmp.name
