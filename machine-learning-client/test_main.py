@@ -1,6 +1,5 @@
 """Tests for the YAMNet-based machine-learning client."""
 
-import os
 import types
 from datetime import datetime, timezone
 
@@ -63,7 +62,7 @@ def test_load_audio_calls_librosa_and_returns_waveform(monkeypatch):
     """load_audio delegates to librosa.load with the right parameters."""
     fake_waveform = np.array([0.1, -0.2, 0.3], dtype=float)
 
-    def fake_librosa_load(path, sr, mono):
+    def fake_librosa_load(sr, mono):
         # Check that target_sr and mono=True are propagated.
         assert sr == main.TARGET_SAMPLE_RATE
         assert mono is True
@@ -97,6 +96,7 @@ def test_save_prediction_success(monkeypatch, capsys):
         """Fake Mongo collection."""
 
         def insert_one(self, doc):
+            """Mock insert_one that stores the document and returns a dummy result."""
             saved_docs.append(doc)
             return DummyInsertOneResult(inserted_id="123456")
 
@@ -126,7 +126,10 @@ def test_save_prediction_failure(monkeypatch, capsys):
     """If Mongo insert fails, save_prediction should print an error and return False."""
 
     class FailingCollection:  # pylint: disable=too-few-public-methods
+        """A mock MongoDB collection that always fails on insert_one."""
+
         def insert_one(self, doc):  # noqa: ARG002
+            """Simulate a database failure by raising RuntimeError."""
             raise RuntimeError("boom")
 
     def fake_get_collection():
@@ -150,10 +153,14 @@ def test_process_scores_sorts_descending():
     """_process_scores should return scores sorted from highest to lowest."""
 
     class DummyScores:  # pylint: disable=too-few-public-methods
+        """Mock scores tensor with a .numpy() method."""
+
         def __init__(self, arr):
+            """Store the mock array."""
             self._arr = arr
 
         def numpy(self):
+            """Return the stored array."""
             return self._arr
 
     scores_array = np.array([[0.1, 0.7, 0.2]])  # shape [frames, classes]
@@ -230,12 +237,11 @@ def test_main_exits_early_if_audio_missing(monkeypatch, tmp_path, capsys):
     fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
     monkeypatch.setattr(main, "hub", fake_hub_module)
 
-    result = main.main()
+    main.main()
 
     captured = capsys.readouterr()
     assert f"Error: {missing_audio} not found." in captured.out
-    # main() has no explicit return; just verify it didn't crash.
-    assert result is None
+
 
 
 def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, capsys):
@@ -255,19 +261,27 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
 
     # 2) Fake model (TF Hub)
     class DummyScores:  # pylint: disable=too-few-public-methods
+        """Mock scores object that mimics a TensorFlow tensor."""
+
         def __init__(self, arr):
+            """Store the underlying numpy array."""
             self._arr = arr
 
         def numpy(self):
+            """Return the stored array."""
             return self._arr
 
     class DummyModel:  # pylint: disable=too-few-public-methods
+        """Mock YAMNet model returning fixed scores."""
+
         def __call__(self, waveform):  # noqa: ARG002
+            """Return deterministic scores instead of real model output."""
             # Shape [frames, classes]; highest score is for "guitar"
             scores = DummyScores(np.array([[0.9, 0.05, 0.05]]))
             return scores, None, None
 
     def fake_hub_load(_url):  # noqa: ARG001
+        """Return a DummyModel instead of loading from TensorFlow Hub."""
         return DummyModel()
 
     fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
@@ -298,7 +312,7 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
         ["guitar", "piano", "violin"],
     )
 
-    result = main.main()
+    main.main()
 
     captured = capsys.readouterr()
 
@@ -308,6 +322,3 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
     # Saved prediction should match detection
     assert saved["instrument"] == "guitar"
     assert np.isclose(saved["confidence"], 0.9)
-
-    # main() still returns None, but we just check it didn't crash
-    assert result is None
