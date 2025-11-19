@@ -92,7 +92,7 @@ class DummyInsertOneResult:  # pylint: disable=too-few-public-methods
 
 
 def test_save_prediction_success(monkeypatch, capsys):
-    """save_prediction should insert a document into Mongo and return True."""
+    """save_prediction should insert a document into Mongo."""
     saved_docs = []
 
     class DummyCollection:  # pylint: disable=too-few-public-methods
@@ -108,10 +108,9 @@ def test_save_prediction_success(monkeypatch, capsys):
 
     monkeypatch.setattr(main, "get_collection", fake_get_collection)
 
-    ok = main.save_prediction("guitar", 0.95)
+    main.save_prediction("guitar", 0.95)
 
     captured = capsys.readouterr()
-    assert ok is True
     assert "Saved prediction to MongoDB with ID: 123456" in captured.out
 
     assert len(saved_docs) == 1
@@ -126,7 +125,7 @@ def test_save_prediction_success(monkeypatch, capsys):
 
 
 def test_save_prediction_failure(monkeypatch, capsys):
-    """If Mongo insert fails, save_prediction should print an error and return False."""
+    """If Mongo insert fails, save_prediction should print an error."""
 
     class FailingCollection:  # pylint: disable=too-few-public-methods
         """A mock MongoDB collection that always fails on insert_one."""
@@ -140,88 +139,10 @@ def test_save_prediction_failure(monkeypatch, capsys):
 
     monkeypatch.setattr(main, "get_collection", fake_get_collection)
 
-    ok = main.save_prediction("piano", 0.5)
+    main.save_prediction("piano", 0.5)
 
     captured = capsys.readouterr()
-    assert ok is False
     assert "Error saving to MongoDB" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# Tests for _process_scores
-# ---------------------------------------------------------------------------
-
-
-def test_process_scores_sorts_descending():
-    """_process_scores should return scores sorted from highest to lowest."""
-
-    class DummyScores:  # pylint: disable=too-few-public-methods
-        """Mock scores tensor with a .numpy() method."""
-
-        def __init__(self, arr):
-            """Store the mock array."""
-            self._arr = arr
-
-        def numpy(self):
-            """Return the stored array."""
-            return self._arr
-
-    scores_array = np.array([[0.1, 0.7, 0.2]])  # shape [frames, classes]
-    dummy_scores = DummyScores(scores_array)
-    class_names = ["class_a", "class_b", "class_c"]
-
-    # pylint: disable=protected-access
-    results = main._process_scores(dummy_scores, class_names)
-
-    # Highest should be class_b with 0.7
-    assert results[0]["class_name"] == "class_b"
-    assert np.isclose(results[0]["score"], 0.7)
-
-
-# ---------------------------------------------------------------------------
-# Tests for _find_instrument
-# ---------------------------------------------------------------------------
-
-
-def test_find_instrument_returns_first_matching_instrument(monkeypatch):
-    """_find_instrument finds the top result whose class_name matches instrument keywords."""
-    # Ensure our keyword list contains "guitar".
-    monkeypatch.setattr(
-        main,
-        "INSTRUMENT_KEYWORDS",
-        ["guitar", "piano", "violin"],
-    )
-
-    sorted_results = [
-        {"class_name": "music", "score": 0.9},
-        {"class_name": "Acoustic guitar", "score": 0.8},
-        {"class_name": "random noise", "score": 0.1},
-    ]
-
-    result = main._find_instrument(sorted_results)  # pylint: disable=protected-access
-
-    assert result is not None
-    assert result["class_name"] == "Acoustic guitar"
-    assert np.isclose(result["score"], 0.8)
-
-
-def test_find_instrument_returns_none_if_no_high_conf_instrument(monkeypatch):
-    """If no high-confidence instrument keyword appears, _find_instrument returns None."""
-    monkeypatch.setattr(
-        main,
-        "INSTRUMENT_KEYWORDS",
-        ["guitar", "piano", "violin"],
-    )
-
-    # Scores below 0.01 or no keyword match
-    sorted_results = [
-        {"class_name": "speech", "score": 0.5},
-        {"class_name": "applause", "score": 0.2},
-        {"class_name": "background noise", "score": 0.05},
-    ]
-
-    result = main._find_instrument(sorted_results)  # pylint: disable=protected-access
-    assert result is None
 
 
 # ---------------------------------------------------------------------------
@@ -311,8 +232,8 @@ def test_main_happy_path_detects_instrument_and_saves(monkeypatch, tmp_path, cap
     # 5) Ensure instrument keywords include guitar
     monkeypatch.setattr(
         main,
-        "INSTRUMENT_KEYWORDS",
-        ["guitar", "piano", "violin"],
+        "ALLOWED_INSTRUMENTS",
+        {"guitar", "piano", "violin"},
     )
 
     main.main()
