@@ -1,6 +1,9 @@
+Flask
+pymongo
+numpy
+librosa
+tensorflow-hub
+pydub
+pytest
 pytest-flask
 pytest-cov
-coverage
-pylint
-pylint
-tensorflow_hub
