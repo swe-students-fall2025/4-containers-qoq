@@ -12,3 +12,4 @@ pytest-flask
 pytest-cov
 coverage
 pylint
+tensorflow_hub

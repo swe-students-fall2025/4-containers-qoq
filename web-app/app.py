@@ -1,6 +1,10 @@
 """Flask backend for the instrument classification web app."""
 
 import os
+import csv
+import io
+import urllib.request
+import urllib.error
 import tempfile
 import traceback
 from datetime import datetime, timezone
@@ -9,20 +13,117 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import librosa
+import tensorflow_hub as hub
 from pydub import AudioSegment
 from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
-
-from mediapipe.tasks import python as mp_python
-from mediapipe.tasks.python import audio as mp_audio
-from mediapipe.tasks.python.components import containers as mp_containers
 
 app = Flask(__name__)
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongodb:27017")
 MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "ml_logs")
 MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "predictions")
+
+CLASS_MAP_URL = (
+    "https://raw.githubusercontent.com/tensorflow/models/master/"
+    "research/audioset/yamnet/yamnet_class_map.csv"
+)
+
+ALLOWED_INSTRUMENTS = {
+    "Guitar",
+    "Electric guitar",
+    "Bass guitar",
+    "Acoustic guitar",
+    "Steel guitar, slide guitar",
+    "Banjo",
+    "Sitar",
+    "Mandolin",
+    "Zither",
+    "Ukulele",
+    "Piano",
+    "Electric piano",
+    "Organ",
+    "Electronic organ",
+    "Hammond organ",
+    "Synthesizer",
+    "Sampler",
+    "Harpsichord",
+    "Drum kit",
+    "Drum machine",
+    "Drum",
+    "Snare drum",
+    "Bass drum",
+    "Timpani",
+    "Tabla",
+    "Cymbal",
+    "Hi-hat",
+    "Wood block",
+    "Tambourine",
+    "Rattle (instrument)",
+    "Maraca",
+    "Gong",
+    "Tubular bells",
+    "Marimba, xylophone",
+    "Glockenspiel",
+    "Vibraphone",
+    "Steelpan",
+    "French horn",
+    "Trumpet",
+    "Trombone",
+    "Violin, fiddle",
+    "Cello",
+    "Double bass",
+    "Flute",
+    "Saxophone",
+    "Clarinet",
+    "Harp",
+    "Bell",
+    "Church bell",
+    "Jingle bell",
+    "Chime",
+    "Wind chime",
+    "Harmonica",
+    "Accordion",
+    "Bagpipes",
+    "Didgeridoo",
+    "Shofar",
+    "Theremin",
+    "Singing bowl",
+}
+
+
+def load_class_map():
+    """Load class names from csv"""
+    try:
+        with urllib.request.urlopen(CLASS_MAP_URL, timeout=10) as response:
+            content = response.read().decode("utf-8")
+        f = io.StringIO(content)
+        reader = csv.reader(f)
+        try:
+            next(reader)
+        except StopIteration:
+            print("Error: Downloaded class map is empty.")
+            return None
+        class_names = [row[2] for row in reader if row]
+        if not class_names:
+            print("Error: Could not parse any class names from downloaded CSV.")
+            return None
+        print(f"Successfully loaded {len(class_names)} classes from GitHub.")
+        return class_names
+    except (OSError, urllib.error.URLError) as e:
+        print(f"Error downloading class map: {e}")
+        return None
+
+
+CLASS_NAMES = load_class_map()
+
+try:
+    model = hub.load("https://tfhub.dev/google/yamnet/1")
+    print("YAMNet Model loaded successfully.")
+except (OSError, RuntimeError) as e:
+    print(f"Error loading model: {e}")
+    model = None
 
 
 @lru_cache(maxsize=1)
@@ -35,66 +136,6 @@ def get_collection():
     """Return the MongoDB collection used to store predictions."""
     db = _get_mongo_client()[MONGO_DB_NAME]
     return db[MONGO_COLLECTION]
-
-
-INSTRUMENT_KEYWORDS = [
-    "guitar",
-    "piano",
-    "violin",
-    "cello",
-    "flute",
-    "trumpet",
-    "saxophone",
-    "drum",
-    "bass",
-    "cymbal",
-    "harp",
-    "organ",
-    "synth",
-    "banjo",
-    "ukulele",
-    "accordion",
-    "harmonica",
-    "clarinet",
-    "trombone",
-    "tuba",
-    "fiddle",
-    "oboe",
-    "bassoon",
-    "xylophone",
-    "marimba",
-    "vibraphone",
-    "string",
-    "percussion",
-    "wind",
-]
-
-BaseOptions = mp_python.BaseOptions
-AudioClassifier = mp_audio.AudioClassifier
-AudioClassifierOptions = mp_audio.AudioClassifierOptions
-AudioRunningMode = mp_audio.RunningMode
-AudioData = mp_containers.AudioData
-
-MODEL_PATH = os.environ.get(
-    "AUDIO_MODEL_PATH",
-    os.path.join(
-        os.path.dirname(__file__),
-        "models",
-        "lite-model_yamnet_classification_tflite_1.tflite",
-    ),
-)
-
-
-@lru_cache(maxsize=1)
-def get_audio_classifier() -> AudioClassifier:
-    """Create and cache the MediaPipe AudioClassifier."""
-    base_options = BaseOptions(model_asset_path=MODEL_PATH)
-    options = AudioClassifierOptions(
-        base_options=base_options,
-        running_mode=AudioRunningMode.AUDIO_CLIPS,
-        max_results=5,
-    )
-    return AudioClassifier.create_from_options(options)
 
 
 class AudioClassificationError(RuntimeError):
@@ -118,45 +159,37 @@ def _convert_audio_with_pydub(path: str) -> Tuple[np.ndarray, int]:
             os.remove(tmp_wav_path)
 
 
-def _normalize_audio(wav_data: np.ndarray) -> np.ndarray:
-    """Normalize audio data to [-1, 1] range."""
-    max_val = float(np.max(np.abs(wav_data)))
-    norm = wav_data.astype(np.float32)
-    if max_val > 0:
-        norm = norm / max_val
-    return norm
-
-
 def classify_wav(path: str) -> Tuple[str, float]:
-    """Run MediaPipe Audio Classifier on an audio file and return (label, score)."""
+    """Classify audio using the YAMNet model"""
+    if model is None:
+        raise AudioClassificationError("Model failed to load.")
+    if CLASS_NAMES is None:
+        raise AudioClassificationError("Class map failed to load. Check file path.")
     try:
-        wav_data, sample_rate = librosa.load(path, sr=16000, mono=True)
+        wav_data, _ = librosa.load(path, sr=16000, mono=True)
     except (OSError, ValueError) as exc:
         try:
-            wav_data, sample_rate = _convert_audio_with_pydub(path)
+            wav_data, _ = _convert_audio_with_pydub(path)
         except (OSError, ValueError) as conv_exc:
             raise AudioClassificationError(
                 f"unable to read audio: {exc} (conversion also failed: {conv_exc})"
             ) from exc
 
-    norm = _normalize_audio(wav_data)
-    audio_data = AudioData.create_from_array(norm, sample_rate)
+    waveform = librosa.util.normalize(wav_data)
+    scores, _, _ = model(waveform)
+    processed_scores = np.mean(scores.numpy(), axis=0)
 
-    classifier = get_audio_classifier()
-    try:
-        result_list = classifier.classify(audio_data)
-    except RuntimeError as exc:
-        raise AudioClassificationError(f"classifier failed: {exc}") from exc
+    results = []
+    for i, score in enumerate(processed_scores):
+        results.append({"class_name": CLASS_NAMES[i], "score": float(score)})
 
-    head = result_list[0].classifications[0]
-    for category in head.categories:
-        label = category.category_name
-        score = float(category.score)
-        for keyword in INSTRUMENT_KEYWORDS:
-            if keyword in label.lower():
-                return label, score
-    top_cat = head.categories[0]
-    return top_cat.category_name, float(top_cat.score)
+    sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+    for res in sorted_results:
+        if res["score"] < 0.005:
+            break
+        if res["class_name"] in ALLOWED_INSTRUMENTS:
+            return res["class_name"], res["score"]
+    return "unknown", 0.0
 
 
 def _serialize_prediction(doc: Dict[str, Any]) -> Dict[str, Any]:
