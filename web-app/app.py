@@ -15,8 +15,6 @@ from flask import (
     jsonify,
     render_template,
     request,
-    redirect,
-    url_for,
     flash,
     session,
 )
