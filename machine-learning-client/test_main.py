@@ -59,19 +59,22 @@ def test_load_audio_missing_file_returns_none(tmp_path, capsys):
 
 
 def test_load_audio_calls_librosa_and_returns_waveform(monkeypatch):
-    """load_audio delegates to librosa.load with the right parameters."""
-    fake_waveform = np.array([0.1, -0.2, 0.3], dtype=float)
+    """load_audio should call librosa.load and return the waveform."""
+    fake_waveform = np.array([0.1, 0.2], dtype=float)
 
-    def fake_librosa_load(sr, mono):
-        # Check that target_sr and mono=True are propagated.
+    def fake_load(path, sr=None, mono=None):
+        # Assert the arguments are passed correctly
+        assert path == "somefile.wav"
         assert sr == main.TARGET_SAMPLE_RATE
         assert mono is True
         return fake_waveform, sr
 
-    monkeypatch.setattr(main, "librosa", types.SimpleNamespace(load=fake_librosa_load))
+    # ✅ Patch only librosa.load, not the whole librosa module
+    monkeypatch.setattr(main.librosa, "load", fake_load)
 
-    result = main.load_audio("dummy.wav", main.TARGET_SAMPLE_RATE)
+    result = main.load_audio("somefile.wav", main.TARGET_SAMPLE_RATE)
 
+    # Should return exactly the waveform from fake_load
     assert isinstance(result, np.ndarray)
     assert np.allclose(result, fake_waveform)
 
