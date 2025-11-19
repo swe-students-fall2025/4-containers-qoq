@@ -107,6 +107,7 @@ def test_load_audio_calls_librosa_and_returns_waveform(monkeypatch):
 
 def test_load_audio_parameter_error_returns_none(monkeypatch, capsys):
     """If librosa raises ParameterError, load_audio returns None."""
+
     def fake_load(path, sr=None, mono=None):  # noqa: ARG001
         raise main.librosa.util.exceptions.ParameterError("Invalid audio format")
 
@@ -428,6 +429,8 @@ def test_main_exits_if_audio_load_fails(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
 
     class DummyModel:  # pylint: disable=too-few-public-methods
+        """Dummy model for testing."""
+
         pass
 
     def fake_hub_load(_url):  # noqa: ARG001
@@ -436,7 +439,8 @@ def test_main_exits_if_audio_load_fails(monkeypatch, tmp_path, capsys):
     fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
     monkeypatch.setattr(main, "hub", fake_hub_module)
 
-    def fake_load_audio(path, target_sr):  # noqa: ARG001
+    def fake_load_audio(_path, _target_sr):
+        """Mock load_audio that returns None."""
         return None
 
     monkeypatch.setattr(main, "load_audio", fake_load_audio)
@@ -459,15 +463,22 @@ def test_main_saves_unknown_when_no_instrument_detected(monkeypatch, tmp_path, c
 
     monkeypatch.setattr(main, "load_class_map", fake_load_class_map)
 
-    class DummyScores:
+    class DummyScores:  # pylint: disable=too-few-public-methods
+        """Dummy scores object for testing."""
+
         def __init__(self, arr):
+            """Store the array."""
             self._arr = arr
 
         def numpy(self):
+            """Return the stored array."""
             return self._arr
 
     class DummyModel:  # pylint: disable=too-few-public-methods
+        """Dummy model for testing."""
+
         def __call__(self, waveform):  # noqa: ARG002
+            """Return dummy scores."""
             scores = DummyScores(np.array([[0.5, 0.3, 0.2]]))
             return scores, None, None
 
@@ -477,7 +488,8 @@ def test_main_saves_unknown_when_no_instrument_detected(monkeypatch, tmp_path, c
     fake_hub_module = types.SimpleNamespace(load=fake_hub_load)
     monkeypatch.setattr(main, "hub", fake_hub_module)
 
-    def fake_load_audio(path, target_sr):  # noqa: ARG001
+    def fake_load_audio(_path, _target_sr):
+        """Mock load_audio that returns zeros."""
         return np.zeros(100, dtype=float)
 
     monkeypatch.setattr(main, "load_audio", fake_load_audio)
