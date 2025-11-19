@@ -47,7 +47,7 @@ jobs:
         working-directory: ./web-app
         run: |
           coverage run --source=. -m pytest
-          coverage report --fail-under=80 || true
+          coverage report --fail-under=80
 
 
 
