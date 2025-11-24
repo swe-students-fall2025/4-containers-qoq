@@ -32,7 +32,9 @@ MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongodb:27017")
 MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "ml_logs")
 MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "predictions")
 
+
 def get_current_user_email() -> str | None:
+    """Get user email"""
     return session.get("user_email")
 
 
@@ -232,6 +234,7 @@ def _store_prediction(
     doc["_id"] = result.inserted_id
     return _serialize_prediction(doc)
 
+
 @app.route("/")
 def root():
     """Always send users to the login screen first."""
@@ -246,6 +249,7 @@ def dashboard():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """Display login page or process login form submission."""
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
         password = (request.form.get("password") or "").strip()
@@ -253,8 +257,7 @@ def login():
             flash("Email and password are required.", "error")
             return render_template("login.html")
 
-        # TODO: real auth
-        session["user_email"] = email   # ⭐ This must exist
+        session["user_email"] = email  # ⭐ This must exist
         return render_template("index.html")  # or redirect(url_for("index"))
 
     return render_template("login.html")
@@ -340,6 +343,7 @@ def api_list_predictions():
     return jsonify(predictions), 200
 
 
+# pylint: disable=too-many-locals
 @app.route("/api/dashboard-data", methods=["GET"])
 def api_dashboard_data():
     """Aggregates data for the dashboard cards + recent log, per user."""
