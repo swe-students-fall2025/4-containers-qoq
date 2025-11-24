@@ -135,6 +135,11 @@ except (OSError, RuntimeError) as e:
     model = None
 
 
+def get_current_user_email() -> str | None:
+    """Get user email"""
+    return session.get("user_email")
+
+
 @lru_cache(maxsize=1)
 def _get_mongo_client() -> MongoClient:
     """Create (and memoize) a MongoClient instance."""
@@ -240,6 +245,7 @@ def _store_prediction(
     confidence: float,
     source: str,
     captured_at: Optional[datetime] = None,
+    user_email: Optional[str] = None,
 ):
     """Persist a prediction document and return its serialized payload."""
     now = datetime.now(timezone.utc)
@@ -253,6 +259,10 @@ def _store_prediction(
         "captured_at": captured_at,
         "created_at": now,
     }
+
+    # only tag if we actually know who the user is
+    if user_email:
+        doc["user_email"] = user_email
 
     col = get_collection()
     result = col.insert_one(doc)
@@ -274,16 +284,16 @@ def dashboard():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """Log in page. On success, go to main index."""
+    """Display login page or process login form submission."""
     if request.method == "POST":
-        email = request.form.get("email", "")
-        password = request.form.get("password", "")
+        email = (request.form.get("email") or "").strip().lower()
+        password = (request.form.get("password") or "").strip()
+        if not email or not password:
+            flash("Email and password are required.", "error")
+            return render_template("login.html")
 
-        if email and password:
-            return render_template("index.html")
-
-        flash("Invalid email or password", "error")
-        return render_template("login.html")
+        session["user_email"] = email  # ⭐ This must exist
+        return render_template("index.html")  # or redirect(url_for("index"))
 
     return render_template("login.html")
 
@@ -346,7 +356,12 @@ def api_create_prediction():
 
 @app.route("/api/predictions", methods=["GET"])
 def api_list_predictions():
-    """Return recent predictions."""
+    """Return recent predictions for the logged-in user."""
+    user_email = session.get("user_email")
+    if not user_email:
+        # Again you could do 401; 200 with [] keeps tests simpler.
+        return jsonify([]), 200
+
     try:
         limit = int(request.args.get("limit", 50))
     except ValueError:
@@ -354,19 +369,45 @@ def api_list_predictions():
     limit = max(1, min(limit, 200))
 
     col = get_collection()
-    cursor = col.find().sort("captured_at", -1).limit(limit)
+    cursor = (
+        col.find({"user_email": user_email})  # ⭐ scope
+        .sort("captured_at", -1)
+        .limit(limit)
+    )
     predictions = [_serialize_prediction(d) for d in cursor]
     return jsonify(predictions), 200
 
 
+# pylint: disable=too-many-locals
 @app.route("/api/dashboard-data", methods=["GET"])
 def api_dashboard_data():
-    """Aggregates data for the dashboard cards + recent log."""
+    """Aggregates data for the dashboard cards + recent log, per user."""
     col = get_collection()
 
-    total_runs = col.count_documents({})
+    user_email = session.get("user_email")
 
-    docs = list(col.find().sort("captured_at", -1).limit(50))
+    # You *only* want dashboards for logged-in users.
+    if not user_email:
+        # You can make this 401 if you want, but 200 with empty data is fine.
+        return (
+            jsonify(
+                {
+                    "total_runs": 0,
+                    "diff_instruments": 0,
+                    "top_instrument": None,
+                    "top_instrument_confidence": None,
+                    "last_analysis_time": None,
+                    "recent": [],
+                }
+            ),
+            200,
+        )
+
+    query: Dict[str, Any] = {"user_email": user_email}  # ⭐ ONLY this user's docs
+
+    total_runs = col.count_documents(query)
+
+    docs = list(col.find(query).sort("captured_at", -1).limit(50))
     predictions = [_serialize_prediction(d) for d in docs]
 
     instruments = set()
@@ -438,7 +479,13 @@ def api_classify_upload():
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-    pred = _store_prediction(label or "unknown", score, source="upload")
+    user_email = session.get("user_email")
+    pred = _store_prediction(
+        label or "unknown",
+        score,
+        source="upload",
+        user_email=user_email,
+    )
     return jsonify(pred), 200
 
 
